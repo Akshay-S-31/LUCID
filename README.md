@@ -158,6 +158,12 @@ RTTS is the primary target dataset for our semi-supervised unannotated real haze
 </center>
 </details>
 
+<details>
+<summary>🔍 Visual Proof: The Hallucination Trap</summary>
+<center>
+    <img src="thesis_visual_proof.png" alt="Thesis Visual Proof showing structural hallucinations in the baseline model compared to our physically constrained ASM output">
+</center>
+</details>
 
 
 ## 🔥 Thesis Milestones & Implementation Log
