@@ -155,6 +155,10 @@ RTTS is the primary target dataset for our semi-supervised unannotated real haze
 <summary>Visual Comparison</summary>
 <center>
     <img src="figs/visual_comparison.png">
+    <br>
+    <img src="figs/RTTS.jpg">
+    <br>
+    <img src="figs/Fattal.jpg">
 </center>
 </details>
 
