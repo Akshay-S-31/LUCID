@@ -49,6 +49,7 @@ As a result, this modified architecture achieves a **+2.88 dB PSNR** improvement
 - **URHI** dataset can be downloaded from [Dropbox](https://utexas.app.box.com/s/7hu094vwkw0cwowv5wijwv9pure2fvup).
 - **Duplicate Removed URHI** can be downloaded from [Google Drive](https://drive.google.com/file/d/1B29LsNhBWoRHDk2R_cc5nNqcn7c87sg-/view?usp=sharing)
 - **RIDCP500** can be downloaded from [RIDCP's Repo](https://github.com/RQ-Wu/RIDCP_dehazing)
+- **SOTS** evaluation dataset can be downloaded from [Google Drive](https://drive.google.com/file/d/12H8-g-cZkJKQy76qhP0Z-_xtcUO56eAl/view?usp=sharing)
 
 ### 2. Download Necessary Pretrained Weights
 Download the pre-trained da-clip weights and place it in `./pretrained_weights/`. You can download the daclip weights we used from [Google Drive](https://drive.google.com/file/d/1bIlKYouxwizQXbud7SXd5F5oOyoHFH4x/view?usp=sharing).
@@ -101,7 +102,7 @@ sh dehazing_options/train_corun_with_colabator_by_depth_single_gpu.sh
 
 ## 🏃‍♂️ Testing LUCID
 
-To quickly use the results of our thesis experiments, place your generated `net_g_latest.pth` inside `./pretrained_weights/LUCID.pth`.
+To quickly use the results of our thesis experiments, place your generated `net_g_latest.pth` inside `./pretrained_weights/LUCID.pth`. Alternatively, you can download our fully trained `LUCID.pth` weight from [Google Drive](https://drive.google.com/file/d/1KzmSJKkEiY8FJXawuSnKAVwd3WoOO68c/view?usp=sharing).
 
 ### 1. Inference
 ```bash
