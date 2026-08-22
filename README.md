@@ -126,7 +126,7 @@ To quickly use the results of our experiments without manual inference or retrai
 
 By forcing the network to adhere to physical scattering models via our modified ASM Gate, we demonstrate that blind aesthetic metrics can easily be "tricked" by structural hallucinations, whereas true ground-truth metrics (PSNR, LPIPS) reveal the physical accuracy of our approach.
 
-<details>
+<details open>
 <summary>Quantitative Comparison on RTTS (Real-World Data)</summary>
 <br>
 
