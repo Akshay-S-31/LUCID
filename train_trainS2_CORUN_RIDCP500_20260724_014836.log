@@ -1,0 +1,2101 @@
+2026-07-24 01:48:36,134 INFO: 
+                ____                _       _____  ____
+               / __ ) ____ _ _____ (_)_____/ ___/ / __ \
+              / __  |/ __ `// ___// // ___/\__ \ / /_/ /
+             / /_/ // /_/ /(__  )/ // /__ ___/ // _, _/
+            /_____/ \__,_//____//_/ \___//____//_/ |_|
+     ______                   __   __                 __      __
+    / ____/____   ____   ____/ /  / /   __  __ _____ / /__   / /
+   / / __ / __ \ / __ \ / __  /  / /   / / / // ___// //_/  / /
+  / /_/ // /_/ // /_/ // /_/ /  / /___/ /_/ // /__ / /<    /_/
+  \____/ \____/ \____/ \____/  /_____/\____/ \___//_/|_|  (_)
+    
+Version Information: 
+	BasicSR: 1.4.2
+	PyTorch: 2.10.0+cu128
+	TorchVision: 0.25.0+cu128
+2026-07-24 01:48:36,135 INFO: 
+  name: trainS2_CORUN_RIDCP500
+  model_type: Colabator_by_Depth
+  scale: 1
+  num_gpu: 2
+  manual_seed: 0
+  colabator:[
+    use_clip: True
+    use_nr_iqa: True
+    clip_model_type: daclip_ViT-B-32
+    tokenizer_type: ViT-B-32
+    pretrained_clip_weight: ./pretrained_weights/daclip_ViT-B-32.pt
+    degradation_type: [1]
+    clip_better: lower
+    nr_iqa_type: musiq
+    nr_iqa_better: higher
+    nr_iqa_scale: [0, 100]
+    block_size: 32
+    weight_map_calculation: addition
+  ]
+  datasets:[
+    train:[
+      name: TrainSet
+      type: SemiHazeOnlineDataset
+      dataroot_gt: /kaggle/working/CORUN-Colabator-main/Datasets/RIDCP/rgb_500
+      dataroot_depth: /kaggle/working/CORUN-Colabator-main/Datasets/RIDCP/depth_500
+      dataroot_real: /kaggle/input/datasets/seraphim31/corun-code/CORUN-Colabator-main/RTTS/RTTS/JPEGImages
+      beta_range: [0.2, 2.8]
+      A_range: [0.25, 1.0]
+      color_p: 1.0
+      color_range: [-0.025, 0.025]
+      use_resize_crop: True
+      use_flip: True
+      use_rot: False
+      filename_tmpl: {}
+      io_backend:[
+        type: disk
+      ]
+      num_worker_per_gpu: 4
+      batch_size_per_gpu: 1
+      mini_batch_sizes: [1]
+      iters: [50000]
+      gt_size: 192
+      gt_sizes: [192]
+      use_shuffle: True
+      dataset_enlarge_ratio: 5
+      prefetch_mode: None
+      phase: train
+      scale: 1
+    ]
+    val:[
+      name: RTTS
+      type: SingleDataset
+      dataroot_lq: /kaggle/input/datasets/seraphim31/corun-code/CORUN-Colabator-main/RTTS/RTTS
+      rescale_too_large_image: False
+      io_backend:[
+        type: disk
+      ]
+      phase: val
+      scale: 1
+    ]
+  ]
+  network_g:[
+    type: CORUN
+    depth: 4
+  ]
+  path:[
+    pretrain_network_g: ./pretrained_weights/CORUN.pth
+    pretrain_network_memory_bank: None
+    param_key_g: params_ema
+    strict_load_g: True
+    resume_state: None
+    experiments_root: /kaggle/working/CORUN-Colabator-main/experiments/trainS2_CORUN_RIDCP500
+    models: /kaggle/working/CORUN-Colabator-main/experiments/trainS2_CORUN_RIDCP500/models
+    training_states: /kaggle/working/CORUN-Colabator-main/experiments/trainS2_CORUN_RIDCP500/training_states
+    log: /kaggle/working/CORUN-Colabator-main/experiments/trainS2_CORUN_RIDCP500
+    visualization: /kaggle/working/CORUN-Colabator-main/experiments/trainS2_CORUN_RIDCP500/visualization
+  ]
+  train:[
+    ema_decay: 0.999
+    optim_g:[
+      type: AdamW
+      lr: 5e-05
+      weight_decay: 0
+      betas: [0.9, 0.999]
+    ]
+    gen_scheduler:[
+      type: CosineAnnealingRestartCyclicLR
+      periods: [50000]
+      restart_weights: [1]
+      eta_mins: [1e-06]
+    ]
+    total_iter: 10000
+    warmup_iter: -1
+    mixing_augs:[
+      mixup: False
+      mixup_beta: 1.2
+      use_identity: True
+    ]
+    pixel_opt:[
+      type: L1Loss
+      loss_weight: 0.5
+      reduction: none
+    ]
+    use_clip_loss: True
+    contrastperceptual_opt:[
+      type: ContrastPerceptualLoss
+      layer_weights:[
+        relu1_1: 0.03125
+        relu2_1: 0.0625
+        relu3_1: 0.125
+        relu4_1: 0.25
+        relu5_1: 1.0
+      ]
+      vgg_type: vgg19
+      use_input_norm: False
+      range_norm: False
+      perceptual_weight: 0.2
+      style_weight: 0
+      criterion: l1
+    ]
+  ]
+  val:[
+    pbar: True
+    val_freq: 5000.0
+    save_img: True
+    window_size: 16
+    save_source: True
+    metrics:[
+      brisque:[
+        type: calculate_brisque
+        crop_border: 0
+        better: lower
+      ]
+      nima:[
+        type: calculate_nima
+        crop_border: 0
+        better: higher
+      ]
+    ]
+  ]
+  logger:[
+    print_freq: 500
+    save_checkpoint_freq: 5000.0
+    use_tb_logger: True
+    wandb:[
+      project: None
+      resume_id: None
+    ]
+  ]
+  dist_params:[
+    backend: nccl
+    port: 29500
+  ]
+  dist: True
+  rank: 0
+  world_size: 2
+  auto_resume: False
+  is_train: True
+  root_path: /kaggle/working/CORUN-Colabator-main
+
+2026-07-24 01:48:50,478 INFO: Dataset [SemiHazeOnlineDataset] - TrainSet is built.
+2026-07-24 01:48:50,478 INFO: Training statistics:
+	Number of train images: 4322
+	Dataset enlarge ratio: 5
+	Batch size per gpu: 1
+	World size (gpu number): 2
+	Require iter number per epoch: 10805
+	Total epochs: 1; iters: 10000.
+2026-07-24 01:48:50,479 INFO: Dataset [SingleDataset] - RTTS is built.
+2026-07-24 01:48:50,479 INFO: Number of val images/folders in RTTS: 0
+2026-07-24 01:48:51,081 INFO: Network [CORUN] is created.
+2026-07-24 01:48:51,670 INFO: Network: DistributedDataParallel - CORUN, with parameters: 18,674,262
+2026-07-24 01:48:51,670 INFO: CORUN(
+  (basic): Sequential(
+    (0): Basic_block_fix_Plus(
+      (trans_prox): ProximalTransmissionBlock()
+      (trans_net): MST(
+        (embedding): Conv2d(4, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (encoder_layers): ModuleList(
+          (0): ModuleList(
+            (0): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=30, out_features=30, bias=False)
+                    (to_k): Linear(in_features=30, out_features=30, bias=False)
+                    (to_v): Linear(in_features=30, out_features=30, bias=False)
+                    (proj): Linear(in_features=30, out_features=30, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+            (1): Downsample(
+              (body): Sequential(
+                (0): Conv2d(30, 15, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelUnshuffle(downscale_factor=2)
+              )
+            )
+          )
+          (1): ModuleList(
+            (0): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=60, out_features=60, bias=False)
+                    (to_k): Linear(in_features=60, out_features=60, bias=False)
+                    (to_v): Linear(in_features=60, out_features=60, bias=False)
+                    (proj): Linear(in_features=60, out_features=60, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+            (1): Downsample(
+              (body): Sequential(
+                (0): Conv2d(60, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelUnshuffle(downscale_factor=2)
+              )
+            )
+          )
+          (2): ModuleList(
+            (0): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=120, out_features=120, bias=False)
+                    (to_k): Linear(in_features=120, out_features=120, bias=False)
+                    (to_v): Linear(in_features=120, out_features=120, bias=False)
+                    (proj): Linear(in_features=120, out_features=120, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+            (1): Downsample(
+              (body): Sequential(
+                (0): Conv2d(120, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelUnshuffle(downscale_factor=2)
+              )
+            )
+          )
+        )
+        (bottleneck): MSAB(
+          (blocks): ModuleList(
+            (0): ModuleList(
+              (0): MS_MSA(
+                (to_q): Linear(in_features=240, out_features=240, bias=False)
+                (to_k): Linear(in_features=240, out_features=240, bias=False)
+                (to_v): Linear(in_features=240, out_features=240, bias=False)
+                (proj): Linear(in_features=240, out_features=240, bias=True)
+                (pos_emb): Sequential(
+                  (0): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                  (1): GELU()
+                  (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                )
+              )
+              (1): PreNorm(
+                (fn): FeedForward(
+                  (net): Sequential(
+                    (0): Conv2d(240, 960, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    (1): GELU()
+                    (2): Conv2d(960, 960, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=960, bias=False)
+                    (3): GELU()
+                    (4): Conv2d(960, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  )
+                )
+                (norm): LayerNorm((240,), eps=1e-05, elementwise_affine=True)
+              )
+            )
+          )
+        )
+        (decoder_layers): ModuleList(
+          (0): ModuleList(
+            (0): Upsample(
+              (body): Sequential(
+                (0): Conv2d(240, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelShuffle(upscale_factor=2)
+              )
+            )
+            (1): Conv2d(240, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (2): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=120, out_features=120, bias=False)
+                    (to_k): Linear(in_features=120, out_features=120, bias=False)
+                    (to_v): Linear(in_features=120, out_features=120, bias=False)
+                    (proj): Linear(in_features=120, out_features=120, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+          )
+          (1): ModuleList(
+            (0): Upsample(
+              (body): Sequential(
+                (0): Conv2d(120, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelShuffle(upscale_factor=2)
+              )
+            )
+            (1): Conv2d(120, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (2): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=60, out_features=60, bias=False)
+                    (to_k): Linear(in_features=60, out_features=60, bias=False)
+                    (to_v): Linear(in_features=60, out_features=60, bias=False)
+                    (proj): Linear(in_features=60, out_features=60, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+          )
+          (2): ModuleList(
+            (0): Upsample(
+              (body): Sequential(
+                (0): Conv2d(60, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelShuffle(upscale_factor=2)
+              )
+            )
+            (1): Conv2d(60, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (2): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=30, out_features=30, bias=False)
+                    (to_k): Linear(in_features=30, out_features=30, bias=False)
+                    (to_v): Linear(in_features=30, out_features=30, bias=False)
+                    (proj): Linear(in_features=30, out_features=30, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+          )
+        )
+        (mapping): Conv2d(30, 1, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (lrelu): LeakyReLU(negative_slope=0.1, inplace=True)
+      )
+      (dehaze_prox): ProximalDehazingBlock()
+      (dehaze_net): MST(
+        (embedding): Conv2d(4, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (encoder_layers): ModuleList(
+          (0): ModuleList(
+            (0): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=30, out_features=30, bias=False)
+                    (to_k): Linear(in_features=30, out_features=30, bias=False)
+                    (to_v): Linear(in_features=30, out_features=30, bias=False)
+                    (proj): Linear(in_features=30, out_features=30, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+            (1): Downsample(
+              (body): Sequential(
+                (0): Conv2d(30, 15, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelUnshuffle(downscale_factor=2)
+              )
+            )
+          )
+          (1): ModuleList(
+            (0): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=60, out_features=60, bias=False)
+                    (to_k): Linear(in_features=60, out_features=60, bias=False)
+                    (to_v): Linear(in_features=60, out_features=60, bias=False)
+                    (proj): Linear(in_features=60, out_features=60, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+            (1): Downsample(
+              (body): Sequential(
+                (0): Conv2d(60, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelUnshuffle(downscale_factor=2)
+              )
+            )
+          )
+          (2): ModuleList(
+            (0): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=120, out_features=120, bias=False)
+                    (to_k): Linear(in_features=120, out_features=120, bias=False)
+                    (to_v): Linear(in_features=120, out_features=120, bias=False)
+                    (proj): Linear(in_features=120, out_features=120, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+            (1): Downsample(
+              (body): Sequential(
+                (0): Conv2d(120, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelUnshuffle(downscale_factor=2)
+              )
+            )
+          )
+        )
+        (bottleneck): MSAB(
+          (blocks): ModuleList(
+            (0): ModuleList(
+              (0): MS_MSA(
+                (to_q): Linear(in_features=240, out_features=240, bias=False)
+                (to_k): Linear(in_features=240, out_features=240, bias=False)
+                (to_v): Linear(in_features=240, out_features=240, bias=False)
+                (proj): Linear(in_features=240, out_features=240, bias=True)
+                (pos_emb): Sequential(
+                  (0): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                  (1): GELU()
+                  (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                )
+              )
+              (1): PreNorm(
+                (fn): FeedForward(
+                  (net): Sequential(
+                    (0): Conv2d(240, 960, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    (1): GELU()
+                    (2): Conv2d(960, 960, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=960, bias=False)
+                    (3): GELU()
+                    (4): Conv2d(960, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  )
+                )
+                (norm): LayerNorm((240,), eps=1e-05, elementwise_affine=True)
+              )
+            )
+          )
+        )
+        (decoder_layers): ModuleList(
+          (0): ModuleList(
+            (0): Upsample(
+              (body): Sequential(
+                (0): Conv2d(240, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelShuffle(upscale_factor=2)
+              )
+            )
+            (1): Conv2d(240, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (2): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=120, out_features=120, bias=False)
+                    (to_k): Linear(in_features=120, out_features=120, bias=False)
+                    (to_v): Linear(in_features=120, out_features=120, bias=False)
+                    (proj): Linear(in_features=120, out_features=120, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+          )
+          (1): ModuleList(
+            (0): Upsample(
+              (body): Sequential(
+                (0): Conv2d(120, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelShuffle(upscale_factor=2)
+              )
+            )
+            (1): Conv2d(120, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (2): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=60, out_features=60, bias=False)
+                    (to_k): Linear(in_features=60, out_features=60, bias=False)
+                    (to_v): Linear(in_features=60, out_features=60, bias=False)
+                    (proj): Linear(in_features=60, out_features=60, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+          )
+          (2): ModuleList(
+            (0): Upsample(
+              (body): Sequential(
+                (0): Conv2d(60, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelShuffle(upscale_factor=2)
+              )
+            )
+            (1): Conv2d(60, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (2): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=30, out_features=30, bias=False)
+                    (to_k): Linear(in_features=30, out_features=30, bias=False)
+                    (to_v): Linear(in_features=30, out_features=30, bias=False)
+                    (proj): Linear(in_features=30, out_features=30, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+          )
+        )
+        (mapping): Conv2d(30, 3, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (lrelu): LeakyReLU(negative_slope=0.1, inplace=True)
+      )
+      (mc_dropout): Dropout(p=0.1, inplace=False)
+    )
+    (1): Basic_block_fix_Plus(
+      (trans_prox): ProximalTransmissionBlock()
+      (trans_net): MST(
+        (embedding): Conv2d(4, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (encoder_layers): ModuleList(
+          (0): ModuleList(
+            (0): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=30, out_features=30, bias=False)
+                    (to_k): Linear(in_features=30, out_features=30, bias=False)
+                    (to_v): Linear(in_features=30, out_features=30, bias=False)
+                    (proj): Linear(in_features=30, out_features=30, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+            (1): Downsample(
+              (body): Sequential(
+                (0): Conv2d(30, 15, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelUnshuffle(downscale_factor=2)
+              )
+            )
+          )
+          (1): ModuleList(
+            (0): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=60, out_features=60, bias=False)
+                    (to_k): Linear(in_features=60, out_features=60, bias=False)
+                    (to_v): Linear(in_features=60, out_features=60, bias=False)
+                    (proj): Linear(in_features=60, out_features=60, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+            (1): Downsample(
+              (body): Sequential(
+                (0): Conv2d(60, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelUnshuffle(downscale_factor=2)
+              )
+            )
+          )
+          (2): ModuleList(
+            (0): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=120, out_features=120, bias=False)
+                    (to_k): Linear(in_features=120, out_features=120, bias=False)
+                    (to_v): Linear(in_features=120, out_features=120, bias=False)
+                    (proj): Linear(in_features=120, out_features=120, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+            (1): Downsample(
+              (body): Sequential(
+                (0): Conv2d(120, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelUnshuffle(downscale_factor=2)
+              )
+            )
+          )
+        )
+        (bottleneck): MSAB(
+          (blocks): ModuleList(
+            (0): ModuleList(
+              (0): MS_MSA(
+                (to_q): Linear(in_features=240, out_features=240, bias=False)
+                (to_k): Linear(in_features=240, out_features=240, bias=False)
+                (to_v): Linear(in_features=240, out_features=240, bias=False)
+                (proj): Linear(in_features=240, out_features=240, bias=True)
+                (pos_emb): Sequential(
+                  (0): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                  (1): GELU()
+                  (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                )
+              )
+              (1): PreNorm(
+                (fn): FeedForward(
+                  (net): Sequential(
+                    (0): Conv2d(240, 960, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    (1): GELU()
+                    (2): Conv2d(960, 960, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=960, bias=False)
+                    (3): GELU()
+                    (4): Conv2d(960, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  )
+                )
+                (norm): LayerNorm((240,), eps=1e-05, elementwise_affine=True)
+              )
+            )
+          )
+        )
+        (decoder_layers): ModuleList(
+          (0): ModuleList(
+            (0): Upsample(
+              (body): Sequential(
+                (0): Conv2d(240, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelShuffle(upscale_factor=2)
+              )
+            )
+            (1): Conv2d(240, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (2): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=120, out_features=120, bias=False)
+                    (to_k): Linear(in_features=120, out_features=120, bias=False)
+                    (to_v): Linear(in_features=120, out_features=120, bias=False)
+                    (proj): Linear(in_features=120, out_features=120, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+          )
+          (1): ModuleList(
+            (0): Upsample(
+              (body): Sequential(
+                (0): Conv2d(120, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelShuffle(upscale_factor=2)
+              )
+            )
+            (1): Conv2d(120, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (2): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=60, out_features=60, bias=False)
+                    (to_k): Linear(in_features=60, out_features=60, bias=False)
+                    (to_v): Linear(in_features=60, out_features=60, bias=False)
+                    (proj): Linear(in_features=60, out_features=60, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+          )
+          (2): ModuleList(
+            (0): Upsample(
+              (body): Sequential(
+                (0): Conv2d(60, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelShuffle(upscale_factor=2)
+              )
+            )
+            (1): Conv2d(60, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (2): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=30, out_features=30, bias=False)
+                    (to_k): Linear(in_features=30, out_features=30, bias=False)
+                    (to_v): Linear(in_features=30, out_features=30, bias=False)
+                    (proj): Linear(in_features=30, out_features=30, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+          )
+        )
+        (mapping): Conv2d(30, 1, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (lrelu): LeakyReLU(negative_slope=0.1, inplace=True)
+      )
+      (dehaze_prox): ProximalDehazingBlock()
+      (dehaze_net): MST(
+        (embedding): Conv2d(4, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (encoder_layers): ModuleList(
+          (0): ModuleList(
+            (0): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=30, out_features=30, bias=False)
+                    (to_k): Linear(in_features=30, out_features=30, bias=False)
+                    (to_v): Linear(in_features=30, out_features=30, bias=False)
+                    (proj): Linear(in_features=30, out_features=30, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+            (1): Downsample(
+              (body): Sequential(
+                (0): Conv2d(30, 15, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelUnshuffle(downscale_factor=2)
+              )
+            )
+          )
+          (1): ModuleList(
+            (0): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=60, out_features=60, bias=False)
+                    (to_k): Linear(in_features=60, out_features=60, bias=False)
+                    (to_v): Linear(in_features=60, out_features=60, bias=False)
+                    (proj): Linear(in_features=60, out_features=60, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+            (1): Downsample(
+              (body): Sequential(
+                (0): Conv2d(60, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelUnshuffle(downscale_factor=2)
+              )
+            )
+          )
+          (2): ModuleList(
+            (0): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=120, out_features=120, bias=False)
+                    (to_k): Linear(in_features=120, out_features=120, bias=False)
+                    (to_v): Linear(in_features=120, out_features=120, bias=False)
+                    (proj): Linear(in_features=120, out_features=120, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+            (1): Downsample(
+              (body): Sequential(
+                (0): Conv2d(120, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelUnshuffle(downscale_factor=2)
+              )
+            )
+          )
+        )
+        (bottleneck): MSAB(
+          (blocks): ModuleList(
+            (0): ModuleList(
+              (0): MS_MSA(
+                (to_q): Linear(in_features=240, out_features=240, bias=False)
+                (to_k): Linear(in_features=240, out_features=240, bias=False)
+                (to_v): Linear(in_features=240, out_features=240, bias=False)
+                (proj): Linear(in_features=240, out_features=240, bias=True)
+                (pos_emb): Sequential(
+                  (0): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                  (1): GELU()
+                  (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                )
+              )
+              (1): PreNorm(
+                (fn): FeedForward(
+                  (net): Sequential(
+                    (0): Conv2d(240, 960, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    (1): GELU()
+                    (2): Conv2d(960, 960, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=960, bias=False)
+                    (3): GELU()
+                    (4): Conv2d(960, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  )
+                )
+                (norm): LayerNorm((240,), eps=1e-05, elementwise_affine=True)
+              )
+            )
+          )
+        )
+        (decoder_layers): ModuleList(
+          (0): ModuleList(
+            (0): Upsample(
+              (body): Sequential(
+                (0): Conv2d(240, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelShuffle(upscale_factor=2)
+              )
+            )
+            (1): Conv2d(240, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (2): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=120, out_features=120, bias=False)
+                    (to_k): Linear(in_features=120, out_features=120, bias=False)
+                    (to_v): Linear(in_features=120, out_features=120, bias=False)
+                    (proj): Linear(in_features=120, out_features=120, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+          )
+          (1): ModuleList(
+            (0): Upsample(
+              (body): Sequential(
+                (0): Conv2d(120, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelShuffle(upscale_factor=2)
+              )
+            )
+            (1): Conv2d(120, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (2): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=60, out_features=60, bias=False)
+                    (to_k): Linear(in_features=60, out_features=60, bias=False)
+                    (to_v): Linear(in_features=60, out_features=60, bias=False)
+                    (proj): Linear(in_features=60, out_features=60, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+          )
+          (2): ModuleList(
+            (0): Upsample(
+              (body): Sequential(
+                (0): Conv2d(60, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                (1): PixelShuffle(upscale_factor=2)
+              )
+            )
+            (1): Conv2d(60, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (2): MSAB(
+              (blocks): ModuleList(
+                (0): ModuleList(
+                  (0): MS_MSA(
+                    (to_q): Linear(in_features=30, out_features=30, bias=False)
+                    (to_k): Linear(in_features=30, out_features=30, bias=False)
+                    (to_v): Linear(in_features=30, out_features=30, bias=False)
+                    (proj): Linear(in_features=30, out_features=30, bias=True)
+                    (pos_emb): Sequential(
+                      (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                      (1): GELU()
+                      (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    )
+                  )
+                  (1): PreNorm(
+                    (fn): FeedForward(
+                      (net): Sequential(
+                        (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                        (1): GELU()
+                        (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                        (3): GELU()
+                        (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      )
+                    )
+                    (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                  )
+                )
+              )
+            )
+          )
+        )
+        (mapping): Conv2d(30, 3, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (lrelu): LeakyReLU(negative_slope=0.1, inplace=True)
+      )
+      (mc_dropout): Dropout(p=0.1, inplace=False)
+    )
+  )
+  (first): Basic_block_fix_Plus(
+    (trans_prox): ProximalTransmissionBlock()
+    (trans_net): MST(
+      (embedding): Conv2d(4, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (encoder_layers): ModuleList(
+        (0): ModuleList(
+          (0): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=30, out_features=30, bias=False)
+                  (to_k): Linear(in_features=30, out_features=30, bias=False)
+                  (to_v): Linear(in_features=30, out_features=30, bias=False)
+                  (proj): Linear(in_features=30, out_features=30, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+          (1): Downsample(
+            (body): Sequential(
+              (0): Conv2d(30, 15, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelUnshuffle(downscale_factor=2)
+            )
+          )
+        )
+        (1): ModuleList(
+          (0): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=60, out_features=60, bias=False)
+                  (to_k): Linear(in_features=60, out_features=60, bias=False)
+                  (to_v): Linear(in_features=60, out_features=60, bias=False)
+                  (proj): Linear(in_features=60, out_features=60, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+          (1): Downsample(
+            (body): Sequential(
+              (0): Conv2d(60, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelUnshuffle(downscale_factor=2)
+            )
+          )
+        )
+        (2): ModuleList(
+          (0): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=120, out_features=120, bias=False)
+                  (to_k): Linear(in_features=120, out_features=120, bias=False)
+                  (to_v): Linear(in_features=120, out_features=120, bias=False)
+                  (proj): Linear(in_features=120, out_features=120, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+          (1): Downsample(
+            (body): Sequential(
+              (0): Conv2d(120, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelUnshuffle(downscale_factor=2)
+            )
+          )
+        )
+      )
+      (bottleneck): MSAB(
+        (blocks): ModuleList(
+          (0): ModuleList(
+            (0): MS_MSA(
+              (to_q): Linear(in_features=240, out_features=240, bias=False)
+              (to_k): Linear(in_features=240, out_features=240, bias=False)
+              (to_v): Linear(in_features=240, out_features=240, bias=False)
+              (proj): Linear(in_features=240, out_features=240, bias=True)
+              (pos_emb): Sequential(
+                (0): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                (1): GELU()
+                (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+              )
+            )
+            (1): PreNorm(
+              (fn): FeedForward(
+                (net): Sequential(
+                  (0): Conv2d(240, 960, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  (1): GELU()
+                  (2): Conv2d(960, 960, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=960, bias=False)
+                  (3): GELU()
+                  (4): Conv2d(960, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                )
+              )
+              (norm): LayerNorm((240,), eps=1e-05, elementwise_affine=True)
+            )
+          )
+        )
+      )
+      (decoder_layers): ModuleList(
+        (0): ModuleList(
+          (0): Upsample(
+            (body): Sequential(
+              (0): Conv2d(240, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelShuffle(upscale_factor=2)
+            )
+          )
+          (1): Conv2d(240, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+          (2): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=120, out_features=120, bias=False)
+                  (to_k): Linear(in_features=120, out_features=120, bias=False)
+                  (to_v): Linear(in_features=120, out_features=120, bias=False)
+                  (proj): Linear(in_features=120, out_features=120, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+        )
+        (1): ModuleList(
+          (0): Upsample(
+            (body): Sequential(
+              (0): Conv2d(120, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelShuffle(upscale_factor=2)
+            )
+          )
+          (1): Conv2d(120, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+          (2): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=60, out_features=60, bias=False)
+                  (to_k): Linear(in_features=60, out_features=60, bias=False)
+                  (to_v): Linear(in_features=60, out_features=60, bias=False)
+                  (proj): Linear(in_features=60, out_features=60, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+        )
+        (2): ModuleList(
+          (0): Upsample(
+            (body): Sequential(
+              (0): Conv2d(60, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelShuffle(upscale_factor=2)
+            )
+          )
+          (1): Conv2d(60, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+          (2): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=30, out_features=30, bias=False)
+                  (to_k): Linear(in_features=30, out_features=30, bias=False)
+                  (to_v): Linear(in_features=30, out_features=30, bias=False)
+                  (proj): Linear(in_features=30, out_features=30, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+        )
+      )
+      (mapping): Conv2d(30, 1, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (lrelu): LeakyReLU(negative_slope=0.1, inplace=True)
+    )
+    (dehaze_prox): ProximalDehazingBlock()
+    (dehaze_net): MST(
+      (embedding): Conv2d(4, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (encoder_layers): ModuleList(
+        (0): ModuleList(
+          (0): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=30, out_features=30, bias=False)
+                  (to_k): Linear(in_features=30, out_features=30, bias=False)
+                  (to_v): Linear(in_features=30, out_features=30, bias=False)
+                  (proj): Linear(in_features=30, out_features=30, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+          (1): Downsample(
+            (body): Sequential(
+              (0): Conv2d(30, 15, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelUnshuffle(downscale_factor=2)
+            )
+          )
+        )
+        (1): ModuleList(
+          (0): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=60, out_features=60, bias=False)
+                  (to_k): Linear(in_features=60, out_features=60, bias=False)
+                  (to_v): Linear(in_features=60, out_features=60, bias=False)
+                  (proj): Linear(in_features=60, out_features=60, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+          (1): Downsample(
+            (body): Sequential(
+              (0): Conv2d(60, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelUnshuffle(downscale_factor=2)
+            )
+          )
+        )
+        (2): ModuleList(
+          (0): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=120, out_features=120, bias=False)
+                  (to_k): Linear(in_features=120, out_features=120, bias=False)
+                  (to_v): Linear(in_features=120, out_features=120, bias=False)
+                  (proj): Linear(in_features=120, out_features=120, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+          (1): Downsample(
+            (body): Sequential(
+              (0): Conv2d(120, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelUnshuffle(downscale_factor=2)
+            )
+          )
+        )
+      )
+      (bottleneck): MSAB(
+        (blocks): ModuleList(
+          (0): ModuleList(
+            (0): MS_MSA(
+              (to_q): Linear(in_features=240, out_features=240, bias=False)
+              (to_k): Linear(in_features=240, out_features=240, bias=False)
+              (to_v): Linear(in_features=240, out_features=240, bias=False)
+              (proj): Linear(in_features=240, out_features=240, bias=True)
+              (pos_emb): Sequential(
+                (0): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                (1): GELU()
+                (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+              )
+            )
+            (1): PreNorm(
+              (fn): FeedForward(
+                (net): Sequential(
+                  (0): Conv2d(240, 960, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  (1): GELU()
+                  (2): Conv2d(960, 960, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=960, bias=False)
+                  (3): GELU()
+                  (4): Conv2d(960, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                )
+              )
+              (norm): LayerNorm((240,), eps=1e-05, elementwise_affine=True)
+            )
+          )
+        )
+      )
+      (decoder_layers): ModuleList(
+        (0): ModuleList(
+          (0): Upsample(
+            (body): Sequential(
+              (0): Conv2d(240, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelShuffle(upscale_factor=2)
+            )
+          )
+          (1): Conv2d(240, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+          (2): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=120, out_features=120, bias=False)
+                  (to_k): Linear(in_features=120, out_features=120, bias=False)
+                  (to_v): Linear(in_features=120, out_features=120, bias=False)
+                  (proj): Linear(in_features=120, out_features=120, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+        )
+        (1): ModuleList(
+          (0): Upsample(
+            (body): Sequential(
+              (0): Conv2d(120, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelShuffle(upscale_factor=2)
+            )
+          )
+          (1): Conv2d(120, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+          (2): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=60, out_features=60, bias=False)
+                  (to_k): Linear(in_features=60, out_features=60, bias=False)
+                  (to_v): Linear(in_features=60, out_features=60, bias=False)
+                  (proj): Linear(in_features=60, out_features=60, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+        )
+        (2): ModuleList(
+          (0): Upsample(
+            (body): Sequential(
+              (0): Conv2d(60, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelShuffle(upscale_factor=2)
+            )
+          )
+          (1): Conv2d(60, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+          (2): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=30, out_features=30, bias=False)
+                  (to_k): Linear(in_features=30, out_features=30, bias=False)
+                  (to_v): Linear(in_features=30, out_features=30, bias=False)
+                  (proj): Linear(in_features=30, out_features=30, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+        )
+      )
+      (mapping): Conv2d(30, 3, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (lrelu): LeakyReLU(negative_slope=0.1, inplace=True)
+    )
+    (mc_dropout): Dropout(p=0.1, inplace=False)
+  )
+  (last): Basic_block_fix_Plus(
+    (trans_prox): ProximalTransmissionBlock()
+    (dehaze_prox): ProximalDehazingBlock()
+    (dehaze_net): MST(
+      (embedding): Conv2d(4, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (encoder_layers): ModuleList(
+        (0): ModuleList(
+          (0): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=30, out_features=30, bias=False)
+                  (to_k): Linear(in_features=30, out_features=30, bias=False)
+                  (to_v): Linear(in_features=30, out_features=30, bias=False)
+                  (proj): Linear(in_features=30, out_features=30, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+          (1): Downsample(
+            (body): Sequential(
+              (0): Conv2d(30, 15, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelUnshuffle(downscale_factor=2)
+            )
+          )
+        )
+        (1): ModuleList(
+          (0): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=60, out_features=60, bias=False)
+                  (to_k): Linear(in_features=60, out_features=60, bias=False)
+                  (to_v): Linear(in_features=60, out_features=60, bias=False)
+                  (proj): Linear(in_features=60, out_features=60, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+          (1): Downsample(
+            (body): Sequential(
+              (0): Conv2d(60, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelUnshuffle(downscale_factor=2)
+            )
+          )
+        )
+        (2): ModuleList(
+          (0): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=120, out_features=120, bias=False)
+                  (to_k): Linear(in_features=120, out_features=120, bias=False)
+                  (to_v): Linear(in_features=120, out_features=120, bias=False)
+                  (proj): Linear(in_features=120, out_features=120, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+          (1): Downsample(
+            (body): Sequential(
+              (0): Conv2d(120, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelUnshuffle(downscale_factor=2)
+            )
+          )
+        )
+      )
+      (bottleneck): MSAB(
+        (blocks): ModuleList(
+          (0): ModuleList(
+            (0): MS_MSA(
+              (to_q): Linear(in_features=240, out_features=240, bias=False)
+              (to_k): Linear(in_features=240, out_features=240, bias=False)
+              (to_v): Linear(in_features=240, out_features=240, bias=False)
+              (proj): Linear(in_features=240, out_features=240, bias=True)
+              (pos_emb): Sequential(
+                (0): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                (1): GELU()
+                (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+              )
+            )
+            (1): PreNorm(
+              (fn): FeedForward(
+                (net): Sequential(
+                  (0): Conv2d(240, 960, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  (1): GELU()
+                  (2): Conv2d(960, 960, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=960, bias=False)
+                  (3): GELU()
+                  (4): Conv2d(960, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                )
+              )
+              (norm): LayerNorm((240,), eps=1e-05, elementwise_affine=True)
+            )
+          )
+        )
+      )
+      (decoder_layers): ModuleList(
+        (0): ModuleList(
+          (0): Upsample(
+            (body): Sequential(
+              (0): Conv2d(240, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelShuffle(upscale_factor=2)
+            )
+          )
+          (1): Conv2d(240, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+          (2): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=120, out_features=120, bias=False)
+                  (to_k): Linear(in_features=120, out_features=120, bias=False)
+                  (to_v): Linear(in_features=120, out_features=120, bias=False)
+                  (proj): Linear(in_features=120, out_features=120, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(120, 480, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(480, 480, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=480, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(480, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((120,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+        )
+        (1): ModuleList(
+          (0): Upsample(
+            (body): Sequential(
+              (0): Conv2d(120, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelShuffle(upscale_factor=2)
+            )
+          )
+          (1): Conv2d(120, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+          (2): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=60, out_features=60, bias=False)
+                  (to_k): Linear(in_features=60, out_features=60, bias=False)
+                  (to_v): Linear(in_features=60, out_features=60, bias=False)
+                  (proj): Linear(in_features=60, out_features=60, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(60, 60, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=60, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(60, 240, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(240, 240, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=240, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(240, 60, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((60,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+        )
+        (2): ModuleList(
+          (0): Upsample(
+            (body): Sequential(
+              (0): Conv2d(60, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (1): PixelShuffle(upscale_factor=2)
+            )
+          )
+          (1): Conv2d(60, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+          (2): MSAB(
+            (blocks): ModuleList(
+              (0): ModuleList(
+                (0): MS_MSA(
+                  (to_q): Linear(in_features=30, out_features=30, bias=False)
+                  (to_k): Linear(in_features=30, out_features=30, bias=False)
+                  (to_v): Linear(in_features=30, out_features=30, bias=False)
+                  (proj): Linear(in_features=30, out_features=30, bias=True)
+                  (pos_emb): Sequential(
+                    (0): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                    (1): GELU()
+                    (2): Conv2d(30, 30, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=30, bias=False)
+                  )
+                )
+                (1): PreNorm(
+                  (fn): FeedForward(
+                    (net): Sequential(
+                      (0): Conv2d(30, 120, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                      (1): GELU()
+                      (2): Conv2d(120, 120, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=120, bias=False)
+                      (3): GELU()
+                      (4): Conv2d(120, 30, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                    )
+                  )
+                  (norm): LayerNorm((30,), eps=1e-05, elementwise_affine=True)
+                )
+              )
+            )
+          )
+        )
+      )
+      (mapping): Conv2d(30, 3, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (lrelu): LeakyReLU(negative_slope=0.1, inplace=True)
+    )
+    (mc_dropout): Dropout(p=0.1, inplace=False)
+  )
+)
+2026-07-24 01:48:52,415 INFO: Loading CORUN model from ./pretrained_weights/CORUN.pth, with param key: [params_ema].
+2026-07-24 01:48:52,542 INFO: Use Exponential Moving Average with decay: 0.999
+2026-07-24 01:48:52,751 INFO: Network [CORUN] is created.
+2026-07-24 01:48:53,047 INFO: Loading CORUN model from ./pretrained_weights/CORUN.pth, with param key: [params_ema].
+2026-07-24 01:48:53,158 INFO: Loss [L1Loss] is created.
+2026-07-24 01:48:54,942 INFO: Loss [ContrastPerceptualLoss] is created.
+2026-07-24 01:49:00,348 INFO: Model [Colabator_by_Depth] is created.
+2026-07-24 01:50:02,334 INFO: Start training from epoch: 0, iter: 0
+2026-07-24 01:51:08,471 INFO: 
+ Updating Patch_Size to 192 and Batch_Size to 2 
+
+2026-07-24 02:05:21,726 INFO: [train..][epoch:  0, iter:     500, lr:(4.999e-05,)] [eta: 4:27:17, time (data): 1.695 (0.007)] l_pix: 8.8259e-02 l_asm: 1.2443e-05 clip_loss: 2.3818e-04 l_percep: 1.8680e-01 l_contrast_percep: 1.9726e-01 data_retention: 2.9167e-01 
+2026-07-24 02:19:29,260 INFO: [train..][epoch:  0, iter:   1,000, lr:(4.995e-05,)] [eta: 4:13:43, time (data): 1.698 (0.007)] l_pix: 1.0356e-01 l_asm: 6.4100e-06 clip_loss: 1.4074e-04 l_percep: 1.7795e-01 l_contrast_percep: 1.9464e-01 data_retention: 1.9444e-01 
+2026-07-24 02:33:36,444 INFO: [train..][epoch:  0, iter:   1,500, lr:(4.989e-05,)] [eta: 3:59:45, time (data): 1.695 (0.008)] l_pix: 6.1446e-02 l_asm: 2.9775e-05 clip_loss: 1.8784e-04 l_percep: 1.7626e-01 l_contrast_percep: 2.3572e-01 data_retention: 3.8889e-01 
+2026-07-24 02:47:44,581 INFO: [train..][epoch:  0, iter:   2,000, lr:(4.981e-05,)] [eta: 3:45:46, time (data): 1.697 (0.008)] l_pix: 6.6625e-02 l_asm: 1.6090e-05 clip_loss: 8.6218e-05 l_percep: 1.9792e-01 l_contrast_percep: 1.8650e-01 data_retention: 3.0556e-01 
+2026-07-24 03:01:53,053 INFO: [train..][epoch:  0, iter:   2,500, lr:(4.970e-05,)] [eta: 3:31:44, time (data): 1.694 (0.008)] l_pix: 6.9620e-02 l_asm: 1.9500e-05 clip_loss: 1.6204e-04 l_percep: 1.8112e-01 l_contrast_percep: 1.9545e-01 data_retention: 5.5556e-01 
+2026-07-24 03:16:03,260 INFO: [train..][epoch:  0, iter:   3,000, lr:(4.957e-05,)] [eta: 3:17:44, time (data): 1.699 (0.008)] l_pix: 9.0463e-02 l_asm: 2.1904e-05 clip_loss: 1.1926e-04 l_percep: 1.7106e-01 l_contrast_percep: 1.8654e-01 data_retention: 4.5833e-01 
+2026-07-24 03:30:12,053 INFO: [train..][epoch:  0, iter:   3,500, lr:(4.941e-05,)] [eta: 3:03:39, time (data): 1.694 (0.008)] l_pix: 6.8668e-02 l_asm: 1.6646e-05 clip_loss: 1.3836e-04 l_percep: 1.5066e-01 l_contrast_percep: 1.7929e-01 data_retention: 4.1667e-01 
+2026-07-24 03:44:20,734 INFO: [train..][epoch:  0, iter:   4,000, lr:(4.923e-05,)] [eta: 2:49:33, time (data): 1.700 (0.008)] l_pix: 1.0482e-01 l_asm: 1.2354e-05 clip_loss: 9.9022e-05 l_percep: 1.3200e-01 l_contrast_percep: 2.2472e-01 data_retention: 5.5556e-01 
+2026-07-24 03:58:31,347 INFO: [train..][epoch:  0, iter:   4,500, lr:(4.903e-05,)] [eta: 2:35:28, time (data): 1.698 (0.009)] l_pix: 1.3680e-01 l_asm: 2.9464e-05 clip_loss: 1.1094e-04 l_percep: 2.0975e-01 l_contrast_percep: 1.9238e-01 data_retention: 5.4167e-01 
+2026-07-24 04:13:14,650 INFO: [train..][epoch:  0, iter:   5,000, lr:(4.880e-05,)] [eta: 2:21:55, time (data): 1.890 (0.009)] l_pix: 7.8616e-02 l_asm: 2.9748e-05 clip_loss: 1.4720e-04 l_percep: 1.6454e-01 l_contrast_percep: 1.7831e-01 data_retention: 6.6667e-01 
+2026-07-24 04:13:14,660 INFO: Saving models and training states.
+2026-07-24 04:13:19,232 INFO: Validation RTTS
+	 # brisque: 0.0000	Best: 0.0000 @ 5000 iter
+	 # nima: 0.0000	Best: 0.0000 @ 5000 iter
+
+2026-07-24 04:27:26,769 INFO: [train..][epoch:  0, iter:   5,500, lr:(4.855e-05,)] [eta: 2:07:44, time (data): 1.699 (0.008)] l_pix: 4.9668e-02 l_asm: 7.3975e-06 clip_loss: 1.1448e-04 l_percep: 1.8482e-01 l_contrast_percep: 2.0718e-01 data_retention: 5.5556e-01 
+2026-07-24 04:41:35,864 INFO: [train..][epoch:  0, iter:   6,000, lr:(4.828e-05,)] [eta: 1:53:30, time (data): 1.699 (0.008)] l_pix: 8.5043e-02 l_asm: 2.4353e-05 clip_loss: 1.1702e-04 l_percep: 1.4819e-01 l_contrast_percep: 1.5749e-01 data_retention: 6.5278e-01 
+2026-07-24 04:55:44,668 INFO: [train..][epoch:  0, iter:   6,500, lr:(4.799e-05,)] [eta: 1:39:17, time (data): 1.701 (0.009)] l_pix: 7.3565e-02 l_asm: 4.0719e-05 clip_loss: 1.4083e-04 l_percep: 1.4238e-01 l_contrast_percep: 1.8384e-01 data_retention: 7.0833e-01 
+2026-07-24 05:09:54,919 INFO: [train..][epoch:  0, iter:   7,000, lr:(4.767e-05,)] [eta: 1:25:05, time (data): 1.699 (0.009)] l_pix: 8.7295e-02 l_asm: 5.0905e-05 clip_loss: 8.5786e-05 l_percep: 1.3883e-01 l_contrast_percep: 2.0629e-01 data_retention: 7.2222e-01 
+2026-07-24 05:24:06,059 INFO: [train..][epoch:  0, iter:   7,500, lr:(4.733e-05,)] [eta: 1:10:54, time (data): 1.704 (0.009)] l_pix: 6.0346e-02 l_asm: 5.9842e-05 clip_loss: 1.7289e-04 l_percep: 1.4919e-01 l_contrast_percep: 2.1692e-01 data_retention: 7.0833e-01 
+2026-07-24 05:38:16,831 INFO: [train..][epoch:  0, iter:   8,000, lr:(4.697e-05,)] [eta: 0:56:43, time (data): 1.701 (0.009)] l_pix: 8.3111e-02 l_asm: 2.5720e-05 clip_loss: 8.8677e-05 l_percep: 1.9838e-01 l_contrast_percep: 2.2557e-01 data_retention: 7.2222e-01 
+2026-07-24 05:52:27,721 INFO: [train..][epoch:  0, iter:   8,500, lr:(4.659e-05,)] [eta: 0:42:31, time (data): 1.706 (0.009)] l_pix: 5.8828e-02 l_asm: 1.4704e-05 clip_loss: 1.4772e-04 l_percep: 1.5856e-01 l_contrast_percep: 2.2972e-01 data_retention: 7.9167e-01 
+2026-07-24 06:06:38,291 INFO: [train..][epoch:  0, iter:   9,000, lr:(4.619e-05,)] [eta: 0:28:20, time (data): 1.703 (0.009)] l_pix: 4.8813e-02 l_asm: 3.3262e-05 clip_loss: 1.0924e-04 l_percep: 1.2570e-01 l_contrast_percep: 1.5253e-01 data_retention: 7.3611e-01 
+2026-07-24 06:20:50,593 INFO: [train..][epoch:  0, iter:   9,500, lr:(4.576e-05,)] [eta: 0:14:09, time (data): 1.707 (0.009)] l_pix: 4.9275e-02 l_asm: 1.3713e-05 clip_loss: 2.2834e-04 l_percep: 1.2275e-01 l_contrast_percep: 2.2622e-01 data_retention: 6.9444e-01 
+2026-07-24 06:35:46,561 INFO: [train..][epoch:  0, iter:  10,000, lr:(4.532e-05,)] [eta: -1 day, 23:59:59, time (data): 1.999 (0.009)] l_pix: 9.6453e-02 l_asm: 3.4770e-05 clip_loss: 8.6724e-05 l_percep: 1.4738e-01 l_contrast_percep: 1.2433e-01 data_retention: 6.3889e-01 
+2026-07-24 06:35:46,569 INFO: Saving models and training states.
+2026-07-24 06:35:48,681 INFO: Validation RTTS
+	 # brisque: 0.0000	Best: 0.0000 @ 10000 iter
+	 # nima: 0.0000	Best: 0.0000 @ 10000 iter
+
+2026-07-24 06:37:03,081 INFO: End of training. Time consumed: 4:47:00
+2026-07-24 06:37:03,082 INFO: Save the latest model.
+2026-07-24 06:37:05,373 INFO: Validation RTTS
+	 # brisque: 0.0000	Best: 0.0000 @ 10002 iter
+	 # nima: 0.0000	Best: 0.0000 @ 10002 iter
+

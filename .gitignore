@@ -1,0 +1,23 @@
+# IDEs
+/.idea
+.DS_Store
+
+# Heavy Weights and Models
+*.pt
+*.pth
+experiments/
+tb_logger/
+
+# Heavy Datasets and Output Images
+Datasets/
+results/
+
+# Backups and Archives
+*.zip
+thesis_backup_extracted/
+
+# Old unwanted directories
+/CORUN_Options/
+/Colabator_Options/
+/Desmoke/
+/Underwater/
