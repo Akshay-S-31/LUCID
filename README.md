@@ -1,6 +1,6 @@
-<p align=center><img src="figs/logo_new.png" width="200px"> </p>
+<p align=center><img src="figs/logo.png" width="200px"> </p>
 
-# <p align=center> `LUCID 🏃🏻‍♂️` </p>
+# <p align=center> `LUCID ` </p>
 
 <b><p align=center> Thesis Research Project ✨</p></b>
 
