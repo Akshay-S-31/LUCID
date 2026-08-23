@@ -10,8 +10,7 @@ This repository contains the official codebase for **LUCID**, our upcoming thesi
 
 ## 🚀 Thesis Contributions: Hallucination Suppression in Real-World Dehazing
 The baseline CORUN+ model achieved high aesthetic scores (BRISQUE/NIMA) but suffered from severe structural hallucinations when evaluated against ground-truth clean images. This extended repository modifies the original codebase to mathematically bind the network to physical reality:
-- **ASM Gate Deadlock Resolution (`phys_error`)**: Replaced redundant MC Dropout variance with deterministic physical drift error (MSE between the real hazy image and its atmospheric reconstruction). This unlocks the gate, allowing up to 100% data retention on real hazy images.
-- **Teacher-Only MC Dropout**: Restricted stochastic MC Dropout solely to the Teacher model, preserving zero overhead during inference.
+- **ASM Gate Deadlock Resolution (`phys_error`)**: Replaced redundant epistemic uncertainty variance with deterministic physical drift error (MSE between the real hazy image and its atmospheric reconstruction). This unlocks the gate, allowing up to 100% data retention on real hazy images.
 - **Masked Perceptual Loss**: Fixed a mathematical bug where perceptual losses were unconditionally applied to rejected pseudo-labels. Perceptual loss is now strictly gated by `* pseudo_mask.mean()`.
 
 As a result, this modified architecture achieves a **+2.88 dB PSNR** improvement and massive hallucination suppression (measured via LPIPS) over the baseline model on the SOTS dataset.
