@@ -134,6 +134,7 @@ RTTS is the primary target dataset for our semi-supervised unannotated real haze
 
 | Metric (Unpaired) | LUCID Best Score |
 | :--- | :---: |
+| **FADE** (↓ better) | 0.7239 |
 | **BRISQUE** (↓ better) | 13.8225 |
 | **NIMA** (↑ better) | 5.3582 |
 
