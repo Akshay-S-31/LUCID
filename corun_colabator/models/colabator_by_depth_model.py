@@ -19,6 +19,8 @@ import time
 from tqdm import tqdm
 import corun_colabator.archs.open_clip as open_clip
 import corun_colabator.archs.memory_bank as memory_bank
+from corun_colabator.archs.corun_arch import enable_mc_dropout, disable_mc_dropout
+from corun_colabator.archs.quadtree_router import QuadtreeRouter, joint_uncertainty
 
 class Mixing_Augment:
     def __init__(self, mixup_beta, use_identity, device):
@@ -75,6 +77,99 @@ class Colabator_by_Depth(SRModel):
             if self.opt['colabator'].get('use_nr_iqa', False):
                 self.init_nriqa()
             self.init_mmb()
+            self.init_lucid()
+
+    def init_lucid(self):
+        """Set up the LUCID additions: MC-Dropout sampling and the quadtree router.
+
+        Every knob is read from the `colabator` option block so the values in the
+        paper are visible in the config rather than buried in the code.
+        """
+        cfg = self.opt['colabator']
+        # Teacher-only MC Dropout (paper Sec. "Teacher-only MC Dropout").
+        self.mc_K = int(cfg.get('mc_K', 5))
+        # ASM gate threshold tau_ASM (paper Eq. 5).
+        self.tau_asm = float(cfg.get('uncertainty_threshold', 0.05))
+        # Joint quadtree spatial routing (paper Sec. "Joint Quadtree Spatial Routing").
+        self.use_quadtree = bool(cfg.get('use_quadtree', True))
+        self.quadtree_router = None
+        if self.use_quadtree:
+            self.quadtree_router = QuadtreeRouter(
+                scorer=self.score_blocks,
+                sizes=cfg.get('quadtree_sizes', [64, 32, 16, 8]),
+                tau_q=float(cfg.get('tau_q', 0.3)),
+                tau_crit=float(cfg.get('tau_crit', 0.7)),
+            )
+
+    def score_blocks(self, blocks):
+        """Combined DA-CLIP + MUSIQ reliability weight for a batch of crops.
+
+        Mirrors the arithmetic that `labal_selection` applies to its uniform
+        grid, so the router's per-leaf weight is directly comparable to the flat
+        mask it replaces:
+
+            M_leaf = (nr_iqa_term + clip_term) / (len(degradation_type) + 1)
+
+        Args:
+            blocks (Tensor): [N, 3, h, w] crops in [0, 1].
+
+        Returns:
+            Tensor: [N] weights, later clamped to [0, 1] by the router.
+        """
+        with torch.no_grad():
+            if self.opt['colabator'].get('use_nr_iqa', False):
+                nr = self.nr_iqa(blocks).reshape(-1)
+                nr = (nr - self.nr_iqa_scale[0]) / (self.nr_iqa_scale[1] - self.nr_iqa_scale[0])
+                if self.nr_iqa_better != 'higher':
+                    nr = 1 - nr
+            else:
+                nr = torch.zeros(blocks.shape[0], device=blocks.device)
+
+            if self.opt['colabator'].get('use_clip', False):
+                n_degr = len(self.degradation_type)
+                clip_term = n_degr - self.get_clip_degrad_rate(blocks).reshape(-1)
+                if self.clip_better != 'higher':
+                    clip_term = n_degr - clip_term
+            else:
+                n_degr = len(self.degradation_type) if self.degradation_type else 0
+                clip_term = torch.zeros(blocks.shape[0], device=blocks.device)
+
+            return (nr + clip_term) / (n_degr + 1)
+
+    @torch.no_grad()
+    def mc_teacher_forward(self, real):
+        """Draw K stochastic teacher samples (paper Eq. 6-7).
+
+        Dropout is enabled only on the teacher's dropout layers; every other
+        layer stays in eval(). The student is never sampled this way, so the
+        deployed generator is deterministic and inference cost is unchanged.
+
+        Returns:
+            tuple: (J_mu, T_mu, var_J, var_T). With mc_K <= 1 the variances are
+            zero and the means reduce to a single deterministic pass.
+        """
+        net = self.net_g_ema
+        if self.mc_K <= 1:
+            pl, pt = net(real, finetune=True)
+            j = pl[0].clamp(0, 1)
+            t = pt[0]
+            return j, t, torch.zeros_like(j), torch.zeros_like(t)
+
+        enable_mc_dropout(net)
+        try:
+            js, ts = [], []
+            for _ in range(self.mc_K):
+                pl, pt = net(real, finetune=True)
+                js.append(pl[0].clamp(0, 1))
+                ts.append(pt[0])
+        finally:
+            # Always restore determinism, even if a forward pass raises.
+            disable_mc_dropout(net)
+
+        j_stack = torch.stack(js, dim=0)
+        t_stack = torch.stack(ts, dim=0)
+        return (j_stack.mean(0), t_stack.mean(0),
+                j_stack.var(0, unbiased=False), t_stack.var(0, unbiased=False))
 
     def init_clip(self):
         clip_model_type = self.opt['colabator'].get('clip_model_type', None)
@@ -276,40 +371,41 @@ class Colabator_by_Depth(SRModel):
                 teacher_score_mask = 0
                 teacher_score = 0
 
-        if joint_uncertainty_map is not None:
-            # Block the uncertainty map exactly like the image is blocked
-            # joint_uncertainty_map shape: [B, 1, H, W]
+        if joint_uncertainty_map is not None and self.quadtree_router is not None:
+            # Joint quadtree spatial routing. The router scores each leaf itself
+            # with the same DA-CLIP + MUSIQ evaluator used above, so its output
+            # already is the multi-scale reliability mask M and replaces the
+            # uniform-grid mask rather than multiplying into it.
+            teacher_mask = self.quadtree_router(teacher_tar, joint_uncertainty_map)
+            # Retention here is the fraction of the image the router did not
+            # hard-zero, i.e. the area still able to contribute gradient.
+            self._data_retention_rate = (teacher_mask > 0).float().mean().item()
+
+        elif joint_uncertainty_map is not None:
+            # Fallback: flat ASM gate on the uniform block grid, used when
+            # colabator.use_quadtree is false.
             uncertainty_blocks = self.block_image(joint_uncertainty_map, (self.block_size, self.block_size))
-            # Calculate the mean uncertainty per block (scalar per block)
-            # uncertainty_blocks shape: [num_H * num_W * B, 1, BH, BW]
-            block_uncertainties = uncertainty_blocks.mean(dim=(1,2,3))
-            
-            # Create a binary confidence gate (1 if confident, 0 if hallucinating)
-            threshold = self.opt['colabator'].get('uncertainty_threshold', 0.05)
-            confidence_gate = (block_uncertainties < threshold).float()
-            
-            # Unblock back to original image shape using the existing unblock_image
-            # unblock_image expects shape [num_H * num_W * B] and reshapes internally
+            block_uncertainties = uncertainty_blocks.mean(dim=(1, 2, 3))
+            confidence_gate = (block_uncertainties < self.tau_asm).float()
             confidence_gate_mask = self.unblock_image(confidence_gate, (self.block_size, self.block_size), original_shape)
-        else:
-            confidence_gate_mask = 1.0
 
-        # final mask
-        if self.weight_map_calculation == 'multiplication':
-            teacher_mask = teacher_nr_iqa_score_mask * (teacher_score_mask / len(self.degradation_type)) * confidence_gate_mask
-        else:
-            teacher_mask = ((teacher_nr_iqa_score_mask + teacher_score_mask) / (len(self.degradation_type) + 1)) * confidence_gate_mask
+            if self.weight_map_calculation == 'multiplication':
+                teacher_mask = teacher_nr_iqa_score_mask * (teacher_score_mask / len(self.degradation_type)) * confidence_gate_mask
+            else:
+                teacher_mask = ((teacher_nr_iqa_score_mask + teacher_score_mask) / (len(self.degradation_type) + 1)) * confidence_gate_mask
+            self._data_retention_rate = confidence_gate.mean().item()
 
+        else:
+            # No uncertainty signal at all: stock Colabator weighting.
+            if self.weight_map_calculation == 'multiplication':
+                teacher_mask = teacher_nr_iqa_score_mask * (teacher_score_mask / len(self.degradation_type))
+            else:
+                teacher_mask = (teacher_nr_iqa_score_mask + teacher_score_mask) / (len(self.degradation_type) + 1)
+            self._data_retention_rate = 1.0
 
         teacher, teacher_transmission, teacher_nr_iqa_score, teacher_score, teacher_mask = self.memory_bank(self.real_name, teacher, teacher_transmission, teacher_nr_iqa_score, teacher_score, self.device, teacher_mask)
         teacher = teacher.to(self.device)
         teacher_transmission = teacher_transmission.to(self.device)
-
-        # Track data retention rate for Tensorboard logging
-        if joint_uncertainty_map is not None:
-            self._data_retention_rate = confidence_gate.mean().item()
-        else:
-            self._data_retention_rate = 1.0
 
         return teacher_transmission, teacher, teacher_mask
 
@@ -325,19 +421,24 @@ class Colabator_by_Depth(SRModel):
         transmission = transmissions[0]
         recon_lq = output * transmission + (1 - transmission)
 
-        # ASM Gate Evaluation (Physical Drift Error)
-        with torch.no_grad():
-            pl, pt = self.net_g_ema(self.real, finetune=True)
-            pseudo_label = pl[0].clamp(0, 1)
-            pseudo_transmission = pt[0]
-            
-        # Physical Drift Error (ASM Gate)
+        # Teacher-only MC Dropout: K stochastic passes give the means that feed
+        # the ASM reconstruction and the variances that feed the router
+        # (paper Eq. 6-7).
+        pseudo_label, pseudo_transmission, var_j, var_t = self.mc_teacher_forward(self.real)
+
+        # Physical drift error (paper Eq. 4-5): how well the teacher's own
+        # prediction re-explains the observed hazy image under the ASM.
         I_recon = pseudo_label * pseudo_transmission + (1 - pseudo_transmission)
-        # Batch-wise MSE, reduced to single channel [B, 1, H, W]
         phys_error = torch.mean((I_recon - self.real) ** 2, dim=1, keepdim=True)
-        
-        # Joint Reliability Map [B, 1, H, W] based on Physical Atmospheric Consistency
-        joint_uncertainty_map = phys_error
+
+        # Joint uncertainty map (paper Eq. 8). With the quadtree enabled this
+        # fuses epistemic variance with physical inconsistency; with it disabled
+        # the flat ASM gate thresholds the raw drift error directly, so the two
+        # paths stay on their own natural scales.
+        if self.use_quadtree:
+            joint_uncertainty_map = joint_uncertainty(var_j, var_t, phys_error)
+        else:
+            joint_uncertainty_map = phys_error
 
         real_outputs, real_transmissions = self.net_g(self.real_strong, finetune=True)
         real_output = real_outputs[0]
