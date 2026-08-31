@@ -2,13 +2,13 @@
 
 # <p align=center> `LUCID ` </p>
 
-<b><p align=center> Thesis Research Project ✨</p></b>
 
-This repository contains the official codebase for **LUCID**, our upcoming thesis paper building upon the baseline CORUN framework. 
+
+This repository contains the official codebase for **LUCID**, our upcoming  paper building upon the baseline CORUN framework. 
 >**LUCID: Locally-adaptive Uncertainty and Coherence-driven Image Dehazing** <br> 
 > *Currently in writing / Unpublished* <br>
 
-## 🚀 Thesis Contributions: Hallucination Suppression in Real-World Dehazing
+## Thesis Contributions: Hallucination Suppression in Real-World Dehazing
 The baseline CORUN+ model achieved high aesthetic scores (BRISQUE/NIMA) but suffered from severe structural hallucinations when evaluated against ground-truth clean images. This extended repository modifies the original codebase to mathematically bind the network to physical reality:
 - **ASM Gate Deadlock Resolution (`phys_error`)**: Replaced redundant epistemic uncertainty variance with deterministic physical drift error (MSE between the real hazy image and its atmospheric reconstruction). This unlocks the gate, allowing up to 100% data retention on real hazy images.
 - - **Teacher-Only MC Dropout**: Restricted stochastic MC Dropout solely to the Teacher model, preserving zero overhead during inference.
