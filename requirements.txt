@@ -3,3 +3,9 @@ timm==0.9.12
 einops
 tqdm
 mat73
+# LUCID additions
+opencv-python
+Pillow
+matplotlib
+pandas
+pyyaml

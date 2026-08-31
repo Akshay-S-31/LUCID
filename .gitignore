@@ -21,3 +21,16 @@ thesis_backup_extracted/
 /Colabator_Options/
 /Desmoke/
 /Underwater/
+# Generated visualisation output (regenerate with scripts/viz/)
+asm_gate_vis/
+reliability_mask_vis/
+figure_search/
+
+# Editor / tooling backups
+*.bak
+.lucid_backup_*/
+
+# Evaluation scratch
+eval_results.txt
+temp_gt.png
+temp_res.png

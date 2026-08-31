@@ -57,9 +57,9 @@ Download the pre-trained da-clip weights and place it in `./pretrained_weights/`
 ### 3. Initialize Conda Environment and Clone Repo
 ⚠️ To ensure consistency of the results, we recommend following our package version to install dependencies.
 ```bash
-git clone https://github.com/cnyvfang/CORUN-Colabator.git
-conda create -n corun_colabator python=3.9
-conda activate corun_colabator
+git clone https://github.com/Akshay-S-31/LUCID.git
+conda create -n lucid python=3.9
+conda activate lucid
 # If necessary, Replace pytorch-cuda=? with the compatible version of your GPU driver.
 conda install pytorch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 pytorch-cuda=12.1 -c pytorch -c nvidia
 ```
@@ -115,10 +115,19 @@ CUDA_VISIBLE_DEVICES=0 python3 corun_colabator/simple_test.py \
 ```
 
 ### 2. Evaluation
-Calculate the unified metrics (BRISQUE, NIMA, PSNR, SSIM, LPIPS) across your evaluation set.
+For unpaired data (BRISQUE, NIMA):
 ```bash
-CUDA_VISIBLE_DEVICES=0 python evaluate.py --input_dir /path/to/results
+CUDA_VISIBLE_DEVICES=0 python scripts/eval/evaluate.py --input_dir /path/to/results
 ```
+For paired data, which also reports PSNR, SSIM, LPIPS, NIQE and MUSIQ:
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/eval/evaluate_full.py \
+  --input_dir /path/to/results --gt_dir /path/to/ground_truth
+```
+> **Evaluation resolution.** Paired metrics are computed at the ground truth's own resolution by default. Pass `--size 256` to compare both images on a 256×256 grid, which is the protocol behind the I-Haze and O-Haze tables.
+
+### 3. Reproducing the paper
+[**docs/REPRODUCE.md**](docs/REPRODUCE.md) gives the exact command behind every table and figure, and [**docs/METHOD.md**](docs/METHOD.md) maps each equation in the paper to the file and function that implements it.
 
 ## 🔍 Results
 

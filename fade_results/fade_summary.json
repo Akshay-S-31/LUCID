@@ -1,0 +1,34 @@
+{
+  "hazy_input": {
+    "dir": "/Users/akshay/CORUN-Colabator-main/Datasets/RTTS/RTTS/JPEGImages",
+    "n": 4322,
+    "mean": 2.5143450504065528,
+    "min": 0.2025085704043982,
+    "max": 10.82040077655482,
+    "seconds": 59.0
+  },
+  "lucid_5k": {
+    "dir": "/Users/akshay/CORUN-Colabator-main/results/Best_BRISQUE_5k/RTTS",
+    "n": 4322,
+    "mean": 0.774281450435838,
+    "min": 0.15005854427587215,
+    "max": 3.241752390451612,
+    "seconds": 65.3
+  },
+  "corun_plus_base": {
+    "dir": "/Users/akshay/CORUN-Colabator-main/results/Baseline_CORunPlus/RTTS",
+    "n": 4322,
+    "mean": 0.8088035784816762,
+    "min": 0.16392990936511542,
+    "max": 3.7071287604955088,
+    "seconds": 66.2
+  },
+  "lucid_30k": {
+    "dir": "/Users/akshay/CORUN-Colabator-main/results/Best_NIMA_30k/RTTS",
+    "n": 4322,
+    "mean": 0.7238829678435975,
+    "min": 0.14970928082455986,
+    "max": 3.32033851366004,
+    "seconds": 71.7
+  }
+}
