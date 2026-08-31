@@ -24,6 +24,29 @@ colabator:
 
   weight_map_calculation: 'addition' # addition, multiplication
 
+  # ------------------------------------------------------------------
+  # LUCID additions. See docs/METHOD.md for the paper equation each of
+  # these corresponds to.
+  # ------------------------------------------------------------------
+
+  # Teacher-only MC Dropout (paper Sec. "Teacher-only MC Dropout").
+  # K stochastic teacher passes produce sigma^2_J and sigma^2_T. The dropout
+  # probability is a property of the network, so it is set under network_g.
+  mc_K: 5
+
+  # ASM gate threshold tau_ASM (paper Eq. 5), as a reconstruction MSE on the
+  # normalised [0,1] image range. Used when use_quadtree is false, and reported
+  # in the tau_ASM parameter analysis.
+  uncertainty_threshold: 0.05
+
+  # Joint quadtree spatial routing (paper Sec. "Joint Quadtree Spatial Routing").
+  # Set use_quadtree: false to fall back to the flat ASM gate on the uniform
+  # block_size grid.
+  use_quadtree: true
+  quadtree_sizes: [64, 32, 16, 8]   # root -> finest, each divides the previous
+  tau_q: 0.3                        # split threshold on mean U_joint in [0,1]
+  tau_crit: 0.7                     # above this a leaf is discarded (weight 0)
+
 # dataset and data loader settings
 datasets:
   train:
@@ -46,9 +69,9 @@ datasets:
     num_worker_per_gpu: 8
     batch_size_per_gpu: 4
     mini_batch_sizes: [ 1 ]             # Batch size per gpu
-    iters: [ 300000 ]
-    gt_size: 288   # Max patch size for progressive training
-    gt_sizes: [ 288 ]  # Patch sizes for progressive training.
+    iters: [ 40000 ]
+    gt_size: 192   # Paper Sec. Implementation Details: 192x192 crop
+    gt_sizes: [ 192 ]  # Patch sizes for progressive training.
 
     # data loader
     use_shuffle: true
@@ -72,6 +95,7 @@ datasets:
 network_g:
   type: CORUN
   depth: 4
+  mc_dropout_p: 0.1   # paper Sec. "Teacher-only MC Dropout"; inert under eval()
 ###########################################
 
 # path
@@ -95,12 +119,12 @@ train:
 
   gen_scheduler:
     type: CosineAnnealingRestartCyclicLR
-    periods: [300000]
+    periods: [40000]
     restart_weights: [1]
     eta_mins: [0.000001]
 
 
-  total_iter: 300000
+  total_iter: 40000
   warmup_iter: -1  # no warm up
 
   mixing_augs:

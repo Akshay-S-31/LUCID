@@ -39,8 +39,8 @@ datasets:
     batch_size_per_gpu: 2
     mini_batch_sizes: [ 2 ]             # Batch size per gpu
     iters: [ 30000 ]
-    gt_size: 288 #288   # Max patch size for progressive training
-    gt_sizes: [ 288 ] # 288  # Patch sizes for progressive training.
+    gt_size: 192   # Paper Sec. Implementation Details: 192x192 crop
+    gt_sizes: [ 192 ]  # Patch sizes for progressive training.
 
     # data loader
     use_shuffle: true
@@ -70,6 +70,7 @@ datasets:
 network_g:
   type: CORUN
   depth: 4
+  mc_dropout_p: 0.1   # paper Sec. "Teacher-only MC Dropout"; inert under eval()
 
 # path
 path:
@@ -85,7 +86,7 @@ train:
 
   optim_g:
     type: AdamW
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     weight_decay: 0
     betas: [0.9, 0.999]
 
@@ -93,7 +94,7 @@ train:
     type: CosineAnnealingRestartCyclicLR
     periods: [30000]
     restart_weights: [1]
-    eta_mins: [0.0001]
+    eta_mins: [!!float 1e-6]
 
   total_iter: 30000
   warmup_iter: -1  # no warm up

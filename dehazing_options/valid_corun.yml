@@ -27,6 +27,7 @@ datasets:
 network_g:
   type: CORUN
   depth: 4
+  mc_dropout_p: 0.1   # paper Sec. "Teacher-only MC Dropout"; inert under eval()
 ###########################################
 
 # path
