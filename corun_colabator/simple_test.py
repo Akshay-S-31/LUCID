@@ -24,6 +24,13 @@ parser.add_argument('--result_dir', default='./results/', type=str, help='Direct
 parser.add_argument('--weights', default='./pretrained_weights/CORUN.pth', type=str, help='Path to weights')
 parser.add_argument('--dataset', default='RTTS', type=str, help='Test Dataset')
 parser.add_argument('--opt', default='../options/valid_corun.yml', type=str, help='options')
+parser.add_argument('--size', default=0, type=int,
+                    help='Resize each input to SIZE x SIZE before inference. '
+                         'Default 0 keeps the native resolution, which is what '
+                         'the reported results use. Set e.g. --size 256 only if '
+                         'you need a fixed small input to fit in memory; note '
+                         'that this changes the output resolution and therefore '
+                         'the metrics.')
 
 
 args = parser.parse_args()
@@ -69,7 +76,8 @@ with torch.no_grad():
             torch.cuda.empty_cache()
 
         img = cv2.imread(inp_file_)
-        img = cv2.resize(img, (256, 256))
+        if args.size:
+            img = cv2.resize(img, (args.size, args.size))
         img = np.float32(img)/255.
         img = torch.from_numpy(img).permute(2,0,1)
         input_ = img.unsqueeze(0).to(device)
