@@ -17,7 +17,7 @@ The baseline CORUN+ model achieved high aesthetic scores (BRISQUE/NIMA) but suff
 As a result, this modified architecture achieves a **+2.88 dB PSNR** improvement and massive hallucination suppression (measured via LPIPS) over the baseline model on the SOTS dataset.
 
 <details>
-<summary>🏃 Abstracted CORUN Backbone Architecture (Thesis Illustration)</summary>
+<summary> Abstracted CORUN Backbone Architecture (Thesis Illustration)</summary>
 <center>
     <img
     src="figs/thesis_diagram_1.jpg">
@@ -25,7 +25,7 @@ As a result, this modified architecture achieves a **+2.88 dB PSNR** improvement
 </details>
 
 <details>
-<summary>🏃🏻‍♂️ Thesis Modification: The Physical ASM Gate inside Colabator</summary>
+<summary> Thesis Modification: The Physical ASM Gate inside Colabator</summary>
 <center>
     <img
     src="figs/thesis_diagram_2.jpg">
@@ -34,7 +34,7 @@ As a result, this modified architecture achieves a **+2.88 dB PSNR** improvement
 </details>
 
 <details>
-<summary>🌳 Thesis Modification: Joint Quadtree Spatial Routing Mechanism</summary>
+<summary>Thesis Modification: Joint Quadtree Spatial Routing Mechanism</summary>
 <center>
     <img
     src="figs/thesis_diagram_3.jpg">
@@ -82,7 +82,7 @@ python init_modules.py
 ```
 *Note: If you are in China Mainland, export `HF_ENDPOINT=https://hf-mirror.com` before init_modules.*
 
-## 🏃 For Image Dehazing Task (LUCID)
+##  For Image Dehazing Task (LUCID)
 
 If you want to use another network to replace our backbone, you only need to add your network to `archs/`, replace the network definition in option files, and run the script. 
 
@@ -100,9 +100,10 @@ Please do not forget to set and load the pre-trained weights of the first stage 
 sh dehazing_options/train_corun_with_colabator_by_depth_single_gpu.sh
 ```
 
-## 🏃‍♂️ Testing LUCID
+## Testing LUCID
 
-To quickly use the results of our thesis experiments, place your generated `net_g_latest.pth` inside `./pretrained_weights/LUCID.pth`. Alternatively, you can download our fully trained `LUCID.pth` weight from [Google Drive](https://drive.google.com/file/d/1KzmSJKkEiY8FJXawuSnKAVwd3WoOO68c/view?usp=sharing).
+To quickly use the results of our thesis experiments, place your fine-tuned checkpoint at `./pretrained_weights/LUCID.pth`. Alternatively, you can download our trained `LUCID.pth` weight — the best-BRISQUE checkpoint at 5,000 fine-tuning iterations — from [Google Drive](https://drive.google.com/file/d/1KzmSJKkEiY8FJXawuSnKAVwd3WoOO68c/view?usp=sharing).
+
 
 ### 1. Inference
 ```bash
@@ -176,7 +177,7 @@ RTTS is the primary target dataset for our semi-supervised unannotated real haze
 </details>
 
 
-## 🔥 Thesis Milestones & Implementation Log
+##  Thesis Milestones & Implementation Log
 - **Final Validation**: Deployed mathematical ASM optimization; evaluated best BRISQUE and NIMA models on real-world RTTS data.
 - **Cloud Optimization**: Automated dataset substitution for missing URHI datasets and patched PyTorch 2.6 security protocols to load CLIP metadata.
 - **Hardware constraints resolved**: Optimized resolution scaling (`gt_size: 192`) and modified network architecture limits to run on a single NVIDIA RTX 4090 Workstation without OOM errors.
