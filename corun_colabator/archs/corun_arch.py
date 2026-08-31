@@ -331,7 +331,7 @@ class ProximalDehazingBlock(nn.Module):
 
 
 class Basic_block_fix_Plus(nn.Module):
-    def __init__(self, last=False):
+    def __init__(self, last=False, mc_dropout_p=0.1):
         super(Basic_block_fix_Plus, self).__init__()
 
         self.trans_prox = ProximalTransmissionBlock()
@@ -341,7 +341,12 @@ class Basic_block_fix_Plus(nn.Module):
         self.dehaze_prox = ProximalDehazingBlock()
         self.dehaze_net = MST(in_dim=4, out_dim=3, dim=30, stage=3, num_blocks=[1,1,1])
 
-
+        # Teacher-only MC Dropout. Bernoulli dropout on the stage scene estimate,
+        # used to draw the K stochastic teacher samples that produce the variance
+        # maps sigma^2_J / sigma^2_T for the quadtree router. nn.Dropout is inert
+        # under .eval(), so the student and the deployed model are deterministic
+        # and inference cost is unchanged.
+        self.mc_dropout = nn.Dropout(p=mc_dropout_p)
 
     def forward(self, img, stage1_trans, stage1_img, stage1_trans_hat, stage1_img_hat, last=False):
         ## GDM
@@ -354,19 +359,44 @@ class Basic_block_fix_Plus(nn.Module):
 
         stage2_img_hat = self.dehaze_prox(img, stage1_img, stage2_trans_hat)
         stage2_img = self.dehaze_net(stage2_img_hat, stage2_trans_hat)
-
+        stage2_img = self.mc_dropout(stage2_img)
 
         return stage2_trans, stage2_img, stage2_trans_hat, stage2_img_hat
 
+def enable_mc_dropout(module):
+    """Put only the MC-Dropout layers into training mode.
+
+    Teacher-only MC Dropout: the surrounding network stays in eval() so that
+    BatchNorm-style running statistics and every other layer behave exactly as
+    at inference, while the Bernoulli dropout used to draw the K stochastic
+    teacher samples becomes active. Call disable_mc_dropout() to restore a fully
+    deterministic forward pass.
+    """
+    for m in module.modules():
+        if isinstance(m, nn.Dropout):
+            m.train()
+    return module
+
+
+def disable_mc_dropout(module):
+    """Make every dropout layer inert, giving a deterministic forward pass."""
+    for m in module.modules():
+        if isinstance(m, nn.Dropout):
+            m.eval()
+    return module
+
+
 @ARCH_REGISTRY.register()
 class CORUN(nn.Module):
-    def __init__(self, depth=3):
+    def __init__(self, depth=3, mc_dropout_p=0.1):
         super(CORUN, self).__init__()
 
         self.depth = depth - 2
-        self.basic = nn.Sequential(*[Basic_block_fix_Plus() for _ in range(self.depth)])
-        self.first = Basic_block_fix_Plus()
-        self.last = Basic_block_fix_Plus(last=True)
+        self.mc_dropout_p = mc_dropout_p
+        self.basic = nn.Sequential(
+            *[Basic_block_fix_Plus(mc_dropout_p=mc_dropout_p) for _ in range(self.depth)])
+        self.first = Basic_block_fix_Plus(mc_dropout_p=mc_dropout_p)
+        self.last = Basic_block_fix_Plus(last=True, mc_dropout_p=mc_dropout_p)
 
     def forward(self, img, debug=False, t_mode=False, finetune=False):
 
