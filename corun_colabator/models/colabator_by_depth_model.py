@@ -466,8 +466,15 @@ class Colabator_by_Depth(SRModel):
             l_total += l_asm
 
         if self.opt['train'].get('use_clip_loss', False):
+            # L_Dens (paper Eq. for L_fine). The synthetic term is unmasked
+            # because it operates on data with valid ground truth. The real term
+            # is scaled by M_bar, the scalar mean of the reliability mask, so a
+            # pseudo-label the router rejected contributes no density signal
+            # either -- previously this term was applied unconditionally, which
+            # was the one pathway through which a rejected label could still
+            # reach the student.
             clip_loss = self.get_batch_avg_degrad_rate(output)
-            clip_loss += self.get_batch_avg_degrad_rate(real_output)
+            clip_loss = clip_loss + self.get_batch_avg_degrad_rate(real_output) * pseudo_mask.mean()
             loss_dict['clip_loss'] = clip_loss
             l_total += clip_loss
 
