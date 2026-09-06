@@ -320,7 +320,7 @@ class Colabator_by_Depth(SRModel):
             _, _, h, w = self.output.size()
             self.output = self.output[:, :, 0:h - mod_pad_h * scale, 0:w - mod_pad_w * scale]
 
-    def labal_selection(self, teacher_transmission, teacher, joint_uncertainty_map=None): # teacher is pseudo label
+    def labal_selection(self, teacher_transmission, teacher, joint_uncertainty_map=None, phys_error=None): # teacher is pseudo label
         teacher_tar = teacher.detach()
         original_shape = teacher_tar.size()
         with torch.no_grad():
@@ -372,13 +372,28 @@ class Colabator_by_Depth(SRModel):
                 teacher_score = 0
 
         if joint_uncertainty_map is not None and self.quadtree_router is not None:
-            # Joint quadtree spatial routing. The router scores each leaf itself
-            # with the same DA-CLIP + MUSIQ evaluator used above, so its output
-            # already is the multi-scale reliability mask M and replaces the
-            # uniform-grid mask rather than multiplying into it.
+            # Joint quadtree spatial routing. The router scores each leaf with
+            # the same DA-CLIP + MUSIQ evaluator used above, producing the
+            # multi-scale reliability mask.
             teacher_mask = self.quadtree_router(teacher_tar, joint_uncertainty_map)
-            # Retention here is the fraction of the image the router did not
-            # hard-zero, i.e. the area still able to contribute gradient.
+
+            # Physical ASM gate (paper Eq. 5). The paper specifies both
+            # mechanisms: the gate accepts a block only when its reconstruction
+            # error falls below tau_ASM, and the router separately fuses
+            # eps_phys with the teacher variances into U_joint. The gate is
+            # applied on the raw drift error, since tau_ASM is defined as an MSE
+            # on the [0,1] image range -- U_joint is min-max normalised and is
+            # not on that scale.
+            if phys_error is not None:
+                err_blocks = self.block_image(phys_error, (self.block_size, self.block_size))
+                block_err = err_blocks.mean(dim=(1, 2, 3))
+                confidence_gate = (block_err < self.tau_asm).float()
+                confidence_gate_mask = self.unblock_image(
+                    confidence_gate, (self.block_size, self.block_size), original_shape)
+                teacher_mask = teacher_mask * confidence_gate_mask
+
+            # Retention is the fraction of the image still able to contribute
+            # gradient after both the router and the gate have been applied.
             self._data_retention_rate = (teacher_mask > 0).float().mean().item()
 
         elif joint_uncertainty_map is not None:
@@ -443,7 +458,8 @@ class Colabator_by_Depth(SRModel):
         real_outputs, real_transmissions = self.net_g(self.real_strong, finetune=True)
         real_output = real_outputs[0]
         real_transmission = real_transmissions[0]
-        pseudo_transmission, pseudo_label, pseudo_mask = self.labal_selection(pseudo_transmission, pseudo_label, joint_uncertainty_map)
+        pseudo_transmission, pseudo_label, pseudo_mask = self.labal_selection(
+            pseudo_transmission, pseudo_label, joint_uncertainty_map, phys_error)
         recon_real_lq = real_output * real_transmission + (1 - real_transmission)
 
         ###########################################
