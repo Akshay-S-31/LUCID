@@ -58,8 +58,21 @@ def load_corun(weights, device, depth=4, mc_dropout_p=0.1):
     return net
 
 
-def crops(hazy_dir, n, size, seed=0):
-    """Random `size` x `size` crops from real hazy images, as training sees them."""
+def crops(hazy_dir, n, size, seed=0, mode='resize'):
+    """Prepare real hazy inputs at `size` x `size`.
+
+    mode='resize' reproduces what training actually feeds the teacher. With
+    `use_resize_crop: true`, SemiHazeOnlineDataset does
+    `cv2.resize(img_real, (gt_size, gt_size), INTER_CUBIC)` -- the whole photo
+    is squashed to the crop size, aspect ratio and all. That downsampling
+    smooths away high-frequency content, which tightens the spread of block
+    means and so changes where the thresholds bite. It is the mode to calibrate
+    against.
+
+    mode='crop' takes a native-resolution window instead. Useful for seeing the
+    signal without the downsampling, but it is not what training sees and will
+    suggest thresholds that are too high.
+    """
     files = sorted(f for f in os.listdir(hazy_dir)
                    if f.lower().endswith(('.png', '.jpg', '.jpeg')))
     rng = random.Random(seed)
@@ -71,12 +84,15 @@ def crops(hazy_dir, n, size, seed=0):
         img = cv2.imread(os.path.join(hazy_dir, f), cv2.IMREAD_COLOR)
         if img is None:
             continue
-        h, w = img.shape[:2]
-        if h < size or w < size:
-            img = cv2.resize(img, (max(size, w), max(size, h)))
+        if mode == 'resize':
+            patch = cv2.resize(img, (size, size), interpolation=cv2.INTER_CUBIC)
+        else:
             h, w = img.shape[:2]
-        top, left = rng.randint(0, h - size), rng.randint(0, w - size)
-        patch = img[top:top + size, left:left + size]
+            if h < size or w < size:
+                img = cv2.resize(img, (max(size, w), max(size, h)))
+                h, w = img.shape[:2]
+            top, left = rng.randint(0, h - size), rng.randint(0, w - size)
+            patch = img[top:top + size, left:left + size]
         patch = cv2.cvtColor(patch, cv2.COLOR_BGR2RGB)
         t = torch.from_numpy(np.ascontiguousarray(patch)).permute(2, 0, 1).float().div_(255.)
         out.append(t.unsqueeze(0))
@@ -120,11 +136,17 @@ def main():
                         'discarded by tau_crit')
     p.add_argument('--tau_q', type=float, default=0.12)
     p.add_argument('--tau_crit', type=float, default=0.22)
+    p.add_argument('--input_mode', choices=['resize', 'crop'], default='resize',
+                   help="how to prepare real inputs: 'resize' matches training "
+                        "(whole photo squashed to gt_size); 'crop' takes a "
+                        "native-resolution window")
     args = p.parse_args()
 
     device = torch.device('cuda' if torch.cuda.is_available()
                           else 'mps' if torch.backends.mps.is_available() else 'cpu')
-    print(f'device: {device}   crops: {args.num} @ {args.size}x{args.size}   S={args.mc_K}')
+    print(f'device: {device}   inputs: {args.num} @ {args.size}x{args.size}   '
+          f'S={args.mc_K}   mode={args.input_mode}'
+          + ('  (matches training)' if args.input_mode == 'resize' else '  (NOT what training sees)'))
 
     from corun_colabator.archs.corun_arch import enable_mc_dropout, disable_mc_dropout
     from corun_colabator.archs.quadtree_router import joint_uncertainty
@@ -136,7 +158,7 @@ def main():
     gate_blocks = []
     phys_px = []
 
-    for x in crops(args.real_dir, args.num, args.size):
+    for x in crops(args.real_dir, args.num, args.size, mode=args.input_mode):
         x = x.to(device)
         with torch.no_grad():
             enable_mc_dropout(net)
@@ -251,7 +273,7 @@ def simulate(net, args, sizes, device):
                             tau_q=args.tau_q, tau_crit=args.tau_crit)
     retentions = []
 
-    for x in crops(args.real_dir, min(args.num, 16), args.size):
+    for x in crops(args.real_dir, min(args.num, 16), args.size, mode=args.input_mode):
         x = x.to(device)
         with torch.no_grad():
             enable_mc_dropout(net)
