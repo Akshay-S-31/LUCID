@@ -146,6 +146,19 @@ def build_config(name, overrides, iters):
     for dotted in DROP:
         del_path(opt, dotted)
 
+    # CosineAnnealingRestartCyclicLR indexes its period list by the current
+    # step and returns None once the step passes the final cumulative period,
+    # which surfaces as "list indices must be integers, not NoneType" partway
+    # through a run rather than at startup. Overriding total_iter alone -- for
+    # instance with --force_yml against a config generated for a different
+    # length -- is enough to trigger it, so assert the three stay in step.
+    assert opt['train']['total_iter'] == opt['train']['gen_scheduler']['periods'][0], (
+        f"total_iter {opt['train']['total_iter']} must equal the scheduler period "
+        f"{opt['train']['gen_scheduler']['periods'][0]}; the LR schedule would run off "
+        f"its period list mid-run. Use --iters rather than overriding total_iter alone.")
+    assert opt['train']['total_iter'] == opt['datasets']['train']['iters'][0], (
+        'total_iter must equal datasets.train.iters[0] (the progressive schedule)')
+
     os.makedirs(CONFIG_DIR, exist_ok=True)
     path = os.path.join(CONFIG_DIR, f'{name}.yml')
     with open(path, 'w') as f:
