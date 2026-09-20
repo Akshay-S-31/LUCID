@@ -397,6 +397,24 @@ class Colabator_by_Depth(SRModel):
             # gradient after both the router and the gate have been applied.
             self._data_retention_rate = (teacher_mask > 0).float().mean().item()
 
+            # Set LUCID_DEBUG_ROUTER=1 to print what the router actually saw.
+            # data_retention alone cannot distinguish "nothing exceeded
+            # tau_crit" from "U_joint is flat" from "the variances are zero",
+            # and those need different fixes.
+            if os.environ.get('LUCID_DEBUG_ROUTER'):
+                u = joint_uncertainty_map
+                r = self.quadtree_router
+                print(f'[router] mc_K={self.mc_K} tau_q={r.tau_q} '
+                      f'tau_crit={r.tau_crit} sizes={r.sizes}\n'
+                      f'[router] U_joint  min={u.min().item():.4f} '
+                      f'mean={u.mean().item():.4f} max={u.max().item():.4f}\n'
+                      f'[router] mask     min={teacher_mask.min().item():.4f} '
+                      f'mean={teacher_mask.mean().item():.4f} '
+                      f'max={teacher_mask.max().item():.4f} '
+                      f'zeros={(teacher_mask == 0).float().mean().item():.4f}\n'
+                      f'[router] retention={self._data_retention_rate:.4f}',
+                      flush=True)
+
         elif joint_uncertainty_map is not None:
             # Fallback: flat ASM gate on the uniform block grid, used when
             # colabator.use_quadtree is false.
@@ -410,6 +428,8 @@ class Colabator_by_Depth(SRModel):
             else:
                 teacher_mask = ((teacher_nr_iqa_score_mask + teacher_score_mask) / (len(self.degradation_type) + 1)) * confidence_gate_mask
             self._data_retention_rate = confidence_gate.mean().item()
+            if os.environ.get('LUCID_DEBUG_ROUTER'):
+                print('[router] FLAT-GATE branch taken (quadtree disabled)', flush=True)
 
         else:
             # No uncertainty signal at all: stock Colabator weighting.
@@ -418,6 +438,9 @@ class Colabator_by_Depth(SRModel):
             else:
                 teacher_mask = (teacher_nr_iqa_score_mask + teacher_score_mask) / (len(self.degradation_type) + 1)
             self._data_retention_rate = 1.0
+            if os.environ.get('LUCID_DEBUG_ROUTER'):
+                print('[router] NO-UNCERTAINTY branch taken -- retention forced to 1.0',
+                      flush=True)
 
         teacher, teacher_transmission, teacher_nr_iqa_score, teacher_score, teacher_mask = self.memory_bank(self.real_name, teacher, teacher_transmission, teacher_nr_iqa_score, teacher_score, self.device, teacher_mask)
         teacher = teacher.to(self.device)
