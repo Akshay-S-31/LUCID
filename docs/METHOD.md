@@ -51,7 +51,7 @@ variance.
 | :--- | :--- |
 | Eq. 4 — `I_recon = J_mu · T_mu + (1 − T_mu)` | `colabator_by_depth_model.py` — `optimize_parameters()` |
 | Eq. 5 — `eps_phys = ||I_real − I_recon||²` | `optimize_parameters()`, channel-mean squared error |
-| Gate `eps_phys < tau_ASM` | `labal_selection()`, the `use_quadtree: false` branch |
+| Gate `eps_phys < tau_ASM` | `labal_selection()`, multiplied into the router's mask on both paths |
 | `tau_ASM = 0.05` | `dehazing_options/train_corun_with_colabator_by_depth.yml` → `colabator.uncertainty_threshold` |
 
 The drift error is computed from the teacher's own prediction, so it needs one
@@ -89,12 +89,19 @@ inputs whose dimensions are not multiples of 64 are still fully covered.
 colabator:
   use_quadtree: true
   quadtree_sizes: [64, 32, 16, 8]
-  tau_q: 0.3
-  tau_crit: 0.7
+  tau_q: 0.12
+  tau_crit: 0.22
 ```
 
 `tau_q` and `tau_crit` are not given numerically in the paper. The values above
 are the documented defaults, applied to `U_joint` after normalisation to `[0,1]`.
+They are calibrated with `scripts/analysis/threshold_diagnostic.py`, which
+measures the distributions the thresholds are compared against. Because both act
+on *block averages* of a normalised map, and normalisation leaves most pixels
+near the map minimum, those averages span only about 0.01 to 0.32 at the root
+level with a median near 0.11. A threshold above that range never fires, so
+these values cannot be chosen by reasoning about `[0,1]` alone.
+
 Setting `use_quadtree: false` falls back to the flat ASM gate on the uniform
 `block_size` grid.
 

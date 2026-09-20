@@ -97,8 +97,8 @@ class Colabator_by_Depth(SRModel):
             self.quadtree_router = QuadtreeRouter(
                 scorer=self.score_blocks,
                 sizes=cfg.get('quadtree_sizes', [64, 32, 16, 8]),
-                tau_q=float(cfg.get('tau_q', 0.3)),
-                tau_crit=float(cfg.get('tau_crit', 0.7)),
+                tau_q=float(cfg.get('tau_q', 0.12)),
+                tau_crit=float(cfg.get('tau_crit', 0.22)),
             )
 
     def score_blocks(self, blocks):

@@ -35,7 +35,7 @@ colabator:
   mc_K: 5
 
   # ASM gate threshold tau_ASM (paper Eq. 5), as a reconstruction MSE on the
-  # normalised [0,1] image range. Used when use_quadtree is false, and reported
+  # normalised [0,1] image range. Applied alongside the router, and reported
   # in the tau_ASM parameter analysis.
   uncertainty_threshold: 0.05
 
@@ -44,8 +44,8 @@ colabator:
   # block_size grid.
   use_quadtree: true
   quadtree_sizes: [64, 32, 16, 8]   # root -> finest, each divides the previous
-  tau_q: 0.3                        # split threshold on mean U_joint in [0,1]
-  tau_crit: 0.7                     # above this a leaf is discarded (weight 0)
+  tau_q: 0.12                      # split a block when mean U_joint exceeds this
+  tau_crit: 0.22                    # discard a leaf when mean U_joint exceeds this
 
 # dataset and data loader settings
 datasets:

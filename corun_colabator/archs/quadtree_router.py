@@ -92,7 +92,7 @@ class QuadtreeRouter(nn.Module):
             (weight forced to zero).
     """
 
-    def __init__(self, scorer, sizes=(64, 32, 16, 8), tau_q=0.3, tau_crit=0.7):
+    def __init__(self, scorer, sizes=(64, 32, 16, 8), tau_q=0.12, tau_crit=0.22):
         super(QuadtreeRouter, self).__init__()
         sizes = tuple(int(s) for s in sizes)
         if len(sizes) < 1:

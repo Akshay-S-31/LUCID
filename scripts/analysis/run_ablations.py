@@ -12,13 +12,22 @@ each of the router's two thresholds:
     full            control -- unmodified LUCID
     no_quadtree     use_quadtree=false; falls back to the flat block gate
     no_mc_dropout   mc_K=1; teacher is deterministic, variances are zero
-    tau_q_0.15      more aggressive splitting
-    tau_q_0.50      less aggressive splitting
-    tau_crit_0.50   discards more leaves
-    tau_crit_0.90   discards fewer leaves
+    tau_q_0.07      more aggressive splitting (~75% of root blocks split)
+    tau_q_0.20      less aggressive splitting (~10% split)
+    tau_crit_0.15   discards more leaves (~30%)
+    tau_crit_0.30   discards fewer leaves (~1%)
 
-tau_q and tau_crit at their defaults (0.3 / 0.7) come from the `full` run, so
-each sweep has three points without extra training.
+tau_q and tau_crit at their defaults (0.12 / 0.22) come from the `full` run,
+so each sweep has three points without extra training.
+
+The sweep values are taken from scripts/analysis/threshold_diagnostic.py,
+which measures the distributions these thresholds are actually compared
+against. Both act on block averages of a min-max normalised U_joint; measured
+over real URHI crops under the pretrained teacher those averages span roughly
+0.01 to 0.32 at the root level, with a median near 0.11. Values chosen by
+reasoning about the nominal [0,1] range instead -- an earlier grid used 0.3
+and 0.7 -- sit beyond the top of that range and never fire, which produces an
+ablation table of identical rows.
 
 Ablations are trained for fewer iterations than the published model (15k by
 default rather than 40k). This is sound as long as every variant uses the same
@@ -58,10 +67,10 @@ VARIANTS = [
     ('full',            {}),
     ('no_quadtree',     {'colabator.use_quadtree': False}),
     ('no_mc_dropout',   {'colabator.mc_K': 1}),
-    ('tau_q_0.15',      {'colabator.tau_q': 0.15}),
-    ('tau_q_0.50',      {'colabator.tau_q': 0.50}),
-    ('tau_crit_0.50',   {'colabator.tau_crit': 0.50}),
-    ('tau_crit_0.90',   {'colabator.tau_crit': 0.90}),
+    ('tau_q_0.07',      {'colabator.tau_q': 0.07}),
+    ('tau_q_0.20',      {'colabator.tau_q': 0.20}),
+    ('tau_crit_0.15',   {'colabator.tau_crit': 0.15}),
+    ('tau_crit_0.30',   {'colabator.tau_crit': 0.30}),
 ]
 
 # Applied to every variant.
@@ -201,7 +210,9 @@ def main():
             sys.exit(f'unknown variant {args.only!r}; '
                      f'choose from {[v[0] for v in VARIANTS]}')
 
-    est_h = args.iters * 1.1 / 3600.0
+    # 0.411 s/iter measured on a single RTX 4090 at gt_size 192, batch 1,
+    # with S=5 teacher passes and the router active.
+    est_h = args.iters * 0.411 / 3600.0
     print(f'{len(variants)} run(s), {args.iters} iterations each')
     print(f'rough estimate: {est_h:.1f} h per run, '
           f'{est_h * len(variants):.1f} h total on a single 4090\n')
