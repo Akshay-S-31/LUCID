@@ -76,6 +76,9 @@ VARIANTS = [
 # Applied to every variant.
 COMMON = {
     'logger.save_checkpoint_freq': 5000,
+    # More frequent logging: retention varies widely per image, so a sparse
+    # trace is hard to read and easy to misinterpret.
+    'logger.print_freq': 250,
 }
 
 # Validation is removed from ablation runs entirely, rather than merely having
@@ -162,20 +165,30 @@ def newest_checkpoint(run_name):
 
 
 def retention_curve(run_name):
-    """Mean data_retention over the last 20 logged points of a run."""
+    """The run's final cumulative mean data_retention.
+
+    Prefers data_retention_avg, the running mean the model accumulates over
+    every iteration. The bare data_retention field is a single image's
+    retained fraction and swings from under 0.05 to 1.0 across URHI, so at
+    print_freq 500 the logged samples are far too sparse to average
+    meaningfully.
+    """
     logs = sorted(glob.glob(f'experiments/ablation_{run_name}/*.log'))
     if not logs:
         return None
-    vals = []
+    avg, inst = None, []
     with open(logs[-1]) as f:
         for line in f:
+            m = re.search(r'data_retention_avg: ([0-9.eE+-]+)', line)
+            if m:
+                avg = float(m.group(1))
+                continue
             m = re.search(r'data_retention: ([0-9.eE+-]+)', line)
             if m:
-                vals.append(float(m.group(1)))
-    if not vals:
-        return None
-    tail = vals[-20:]
-    return sum(tail) / len(tail)
+                inst.append(float(m.group(1)))
+    if avg is not None:
+        return avg
+    return sum(inst) / len(inst) if inst else None
 
 
 def prune(run_name):

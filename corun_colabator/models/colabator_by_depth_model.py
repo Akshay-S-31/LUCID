@@ -543,8 +543,19 @@ class Colabator_by_Depth(SRModel):
         if self.ema_decay > 0:
             self.model_ema(decay=self.ema_decay)
 
-        # Log data retention rate from Quadtree gating
+        # Log data retention from the router.
+        #
+        # The per-iteration value is genuinely noisy: it is the retained
+        # fraction of a single real image, and across URHI that ranges from
+        # under 0.05 to 1.0. With print_freq at 500 the log would otherwise
+        # show one arbitrary sample, which is unreadable as a trend and was
+        # initially mistaken for the gate never firing. The cumulative mean is
+        # the figure an ablation should compare.
         if hasattr(self, '_data_retention_rate'):
+            self._retention_sum = getattr(self, '_retention_sum', 0.0) + self._data_retention_rate
+            self._retention_count = getattr(self, '_retention_count', 0) + 1
             loss_dict['data_retention'] = torch.tensor(self._data_retention_rate)
+            loss_dict['data_retention_avg'] = torch.tensor(
+                self._retention_sum / self._retention_count)
 
         self.log_dict = self.reduce_loss_dict(loss_dict)
