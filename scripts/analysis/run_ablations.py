@@ -64,14 +64,27 @@ VARIANTS = [
     ('tau_crit_0.90',   {'colabator.tau_crit': 0.90}),
 ]
 
-# Applied to every variant. Validation image writing is the one setting that can
-# quietly fill a disk: at val_freq 5000 with save_img on, each run dumps the
-# whole RTTS set to disk several times over.
+# Applied to every variant.
 COMMON = {
-    'val.save_img': False,
-    'val.save_source': False,
     'logger.save_checkpoint_freq': 5000,
 }
+
+# Validation is removed from ablation runs entirely, rather than merely having
+# its image writing switched off.
+#
+# Two reasons. First, in this codebase the metric inputs are coupled to image
+# saving: sr_model.nondist_validation populates metric_data['brisque'],
+# ['nima'] and ['img_path'] *inside* its `if save_img:` branch, so setting
+# save_img false leaves calculate_brisque() without its arguments and
+# validation raises TypeError. Second, validation here means a full pass over
+# all 4322 RTTS images, which at save_img true would write them to disk several
+# times per run, and costs significant time even when it does not.
+#
+# Dropping it loses nothing for an ablation: data_retention is logged every
+# iteration during training, and each finished run is measured by
+# scripts/eval/lucid_stream_eval.py, which additionally covers the paired
+# SOTS metrics that in-training validation cannot produce.
+DROP = ['val', 'datasets.val']
 
 
 def set_path(d, dotted, value):
@@ -85,6 +98,17 @@ def set_path(d, dotted, value):
     if keys[-1] not in node:
         raise KeyError(f'{dotted}: no such key {keys[-1]!r} in the base config')
     node[keys[-1]] = value
+
+
+def del_path(d, dotted):
+    """Remove d['a']['b'] for dotted == 'a.b'; silent if already absent."""
+    keys = dotted.split('.')
+    node = d
+    for k in keys[:-1]:
+        if k not in node:
+            return
+        node = node[k]
+    node.pop(keys[-1], None)
 
 
 def build_config(name, overrides, iters):
@@ -107,6 +131,8 @@ def build_config(name, overrides, iters):
         set_path(opt, dotted, value)
     for dotted, value in overrides.items():
         set_path(opt, dotted, value)
+    for dotted in DROP:
+        del_path(opt, dotted)
 
     os.makedirs(CONFIG_DIR, exist_ok=True)
     path = os.path.join(CONFIG_DIR, f'{name}.yml')
