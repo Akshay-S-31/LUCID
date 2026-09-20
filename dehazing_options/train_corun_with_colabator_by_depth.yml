@@ -46,6 +46,7 @@ colabator:
   quadtree_sizes: [64, 32, 16, 8]   # root -> finest, each divides the previous
   tau_q: 0.12                      # split a block when mean U_joint exceeds this
   tau_crit: 0.22                    # discard a leaf when mean U_joint exceeds this
+  scorer_batch: 64                  # max leaves scored per DA-CLIP/MUSIQ call
 
 # dataset and data loader settings
 datasets:

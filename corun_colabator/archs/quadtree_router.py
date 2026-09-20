@@ -90,9 +90,14 @@ class QuadtreeRouter(nn.Module):
             block is confidently reliable and becomes a leaf.
         tau_crit (float): a leaf whose mean U_joint exceeds this is discarded
             (weight forced to zero).
+        max_batch (int): most leaves scored in one call to `scorer`. The
+            evaluators resample each crop to their own input size, so peak
+            memory scales with the leaf count; splitting a 192x192 crop to the
+            finest level yields 576 leaves, which will not fit in one pass.
     """
 
-    def __init__(self, scorer, sizes=(64, 32, 16, 8), tau_q=0.12, tau_crit=0.22):
+    def __init__(self, scorer, sizes=(64, 32, 16, 8), tau_q=0.12, tau_crit=0.22,
+                 max_batch=64):
         super(QuadtreeRouter, self).__init__()
         sizes = tuple(int(s) for s in sizes)
         if len(sizes) < 1:
@@ -107,6 +112,7 @@ class QuadtreeRouter(nn.Module):
         self.sizes = sizes
         self.tau_q = float(tau_q)
         self.tau_crit = float(tau_crit)
+        self.max_batch = max(1, int(max_batch))
 
     @torch.no_grad()
     def forward(self, image, u_joint):
@@ -182,22 +188,31 @@ class QuadtreeRouter(nn.Module):
             by_size.setdefault(sz, []).append((b, top, bot, left, right, block_u))
 
         for sz, group in by_size.items():
-            crops = []
-            for (b, top, bot, left, right, _) in group:
-                crop = image[b:b + 1, :, top:bot, left:right]
-                # Only partial edge blocks are resampled, and only up to their
-                # own nominal size, so the scorer sees a uniform batch.
-                if crop.shape[-2:] != (sz, sz):
-                    crop = F.interpolate(crop, size=(sz, sz),
-                                         mode='bilinear', align_corners=False)
-                crops.append(crop)
+            # Score in bounded chunks rather than one call per size group. The
+            # evaluators resample every crop to their own input resolution --
+            # DA-CLIP to 224x224 -- so the memory a call needs depends on the
+            # number of leaves, not their size. A 192x192 crop split all the way
+            # down yields (192/8)^2 = 576 leaves, and concatenating those into a
+            # single forward pass exhausts a 24 GB card.
+            for start in range(0, len(group), self.max_batch):
+                chunk = group[start:start + self.max_batch]
 
-            scores = self.scorer(torch.cat(crops, dim=0))
-            scores = scores.reshape(-1).to(mask.dtype).clamp(0, 1)
+                crops = []
+                for (b, top, bot, left, right, _) in chunk:
+                    crop = image[b:b + 1, :, top:bot, left:right]
+                    # Only partial edge blocks are resampled, and only up to
+                    # their own nominal size, so the scorer sees a uniform batch.
+                    if crop.shape[-2:] != (sz, sz):
+                        crop = F.interpolate(crop, size=(sz, sz),
+                                             mode='bilinear', align_corners=False)
+                    crops.append(crop)
 
-            for idx, (b, top, bot, left, right, block_u) in enumerate(group):
-                if block_u > self.tau_crit:
-                    # Irrecoverable region: hard zero, no gradient at all.
-                    mask[b, :, top:bot, left:right] = 0.0
-                else:
-                    mask[b, :, top:bot, left:right] = scores[idx]
+                scores = self.scorer(torch.cat(crops, dim=0))
+                scores = scores.reshape(-1).to(mask.dtype).clamp(0, 1)
+
+                for idx, (b, top, bot, left, right, block_u) in enumerate(chunk):
+                    if block_u > self.tau_crit:
+                        # Irrecoverable region: hard zero, no gradient at all.
+                        mask[b, :, top:bot, left:right] = 0.0
+                    else:
+                        mask[b, :, top:bot, left:right] = scores[idx]
