@@ -114,6 +114,12 @@ def main():
     p.add_argument('--mc_K', type=int, default=5)
     p.add_argument('--block_size', type=int, default=32, help='ASM gate block size')
     p.add_argument('--quadtree_sizes', default='64,32,16,8')
+    p.add_argument('--simulate_router', action='store_true',
+                   help='also run the real QuadtreeRouter and report, per crop, '
+                        'how many leaves land at each level and how many are '
+                        'discarded by tau_crit')
+    p.add_argument('--tau_q', type=float, default=0.12)
+    p.add_argument('--tau_crit', type=float, default=0.22)
     args = p.parse_args()
 
     device = torch.device('cuda' if torch.cuda.is_available()
@@ -181,6 +187,124 @@ def main():
     print('\nRead the suggested values off the rows above and use them as the '
           'ablation grid;\na threshold beyond the p99 of its distribution will '
           'never fire.')
+
+    if args.simulate_router:
+        simulate(net, args, sizes, device)
+
+
+def simulate(net, args, sizes, device):
+    """Run the real router and report where leaves land and what gets discarded.
+
+    Percentiles of block means only bound what *could* happen. Which blocks
+    actually reach the finest level depends on the recursion: a block is only
+    examined at 8x8 if every ancestor exceeded tau_Q, so the population seen at
+    each level is a biased subset of the overall distribution rather than a
+    sample from it. This runs the router itself so the leaf counts and the
+    discard count are the real ones.
+    """
+    from corun_colabator.archs.corun_arch import enable_mc_dropout, disable_mc_dropout
+    from corun_colabator.archs.quadtree_router import QuadtreeRouter, joint_uncertainty
+
+    def walk(u, H, W):
+        """Replicate QuadtreeRouter's traversal, returning (size, mean) leaves.
+
+        The router does not expose the block means behind its decisions, and
+        they are the quantity tau_crit is judged against. Note these are *not*
+        a sample of all blocks at a level: a block is only examined at 8x8 if
+        every ancestor exceeded tau_Q, so this population is selected by the
+        recursion and is what tau_crit actually sees.
+        """
+        pending = [(t, l, sizes[0]) for t in range(0, H, sizes[0])
+                   for l in range(0, W, sizes[0])]
+        out = []
+        for level, sz in enumerate(sizes):
+            if not pending:
+                break
+            finest = (level == len(sizes) - 1)
+            nxt = []
+            for (top, left, s) in pending:
+                bot, right = min(top + s, H), min(left + s, W)
+                if bot <= top or right <= left:
+                    continue
+                bu = float(u[0, :, top:bot, left:right].mean())
+                if bu <= args.tau_q or finest:
+                    out.append((s, bu))
+                else:
+                    ch = sizes[level + 1]
+                    for dy in range(0, s, ch):
+                        for dx in range(0, s, ch):
+                            if top + dy < H and left + dx < W:
+                                nxt.append((top + dy, left + dx, ch))
+            pending = nxt
+        return out
+
+    seen = {'by_size': {}}
+    leaf_u = {s: [] for s in sizes}
+
+    def scorer(x):
+        # Constant 1.0: the mask then reflects only the router's hard discards,
+        # isolating tau_crit from the DA-CLIP / MUSIQ weighting.
+        seen['by_size'][x.shape[-1]] = seen['by_size'].get(x.shape[-1], 0) + x.shape[0]
+        return torch.ones(x.shape[0], device=x.device)
+
+    router = QuadtreeRouter(scorer, sizes=sizes,
+                            tau_q=args.tau_q, tau_crit=args.tau_crit)
+    retentions = []
+
+    for x in crops(args.real_dir, min(args.num, 16), args.size):
+        x = x.to(device)
+        with torch.no_grad():
+            enable_mc_dropout(net)
+            try:
+                js, ts = [], []
+                for _ in range(args.mc_K):
+                    pl, pt = net(x, finetune=True)
+                    js.append(pl[0].clamp(0, 1))
+                    ts.append(pt[0])
+            finally:
+                disable_mc_dropout(net)
+            J, T = torch.stack(js, 0), torch.stack(ts, 0)
+            j_mu, t_mu = J.mean(0), T.mean(0)
+            var_j, var_t = J.var(0, unbiased=False), T.var(0, unbiased=False)
+            eps = torch.mean((j_mu * t_mu + (1 - t_mu) - x) ** 2, dim=1, keepdim=True)
+            u = joint_uncertainty(var_j, var_t, eps)
+            m = router(j_mu, u)
+        retentions.append((m > 0).float().mean().item())
+        for sz, bu in walk(u, args.size, args.size):
+            leaf_u[sz].append(bu)
+
+    print('\n' + '=' * 72)
+    print(f'ROUTER SIMULATION   tau_Q={args.tau_q}  tau_crit={args.tau_crit}')
+    print('=' * 72)
+    print('  variance magnitudes (before normalisation):')
+    print(f'    var_J mean {var_j.mean().item():.3e}   max {var_j.max().item():.3e}')
+    print(f'    var_T mean {var_t.mean().item():.3e}   max {var_t.max().item():.3e}')
+    print(f'    eps   mean {eps.mean().item():.3e}   max {eps.max().item():.3e}')
+    print(f'  U_joint: mean {u.mean().item():.4f}  max {u.max().item():.4f}')
+    print('  leaves scored per level:')
+    for s in sizes:
+        print(f'    {s:>3d}x{s:<3d}  {seen["by_size"].get(s, 0)}')
+    r = np.array(retentions)
+    print(f'  data_retention: mean {r.mean():.4f}  min {r.min():.4f}  max {r.max():.4f}')
+    print('\n  leaf block-mean U_joint, as selected by the recursion')
+    print('  (this, not the distribution over all blocks, is what tau_crit sees):')
+    allv = []
+    for s in sizes:
+        v = np.array(leaf_u[s])
+        if v.size == 0:
+            continue
+        allv.append(v)
+        qs = np.percentile(v, [50, 90, 95, 99])
+        print(f'    {s:>3d}x{s:<3d} n={v.size:<6d} '
+              f'p50={qs[0]:.4f} p90={qs[1]:.4f} p95={qs[2]:.4f} p99={qs[3]:.4f} '
+              f'max={v.max():.4f}')
+    if allv:
+        v = np.concatenate(allv)
+        print(f'\n  across all leaves: max={v.max():.4f}')
+        print(f'  tau_crit that would discard  1% of leaves: {np.quantile(v, 0.99):.4f}')
+        print(f'  tau_crit that would discard  5% of leaves: {np.quantile(v, 0.95):.4f}')
+        print(f'  tau_crit that would discard 10% of leaves: {np.quantile(v, 0.90):.4f}')
+        print(f'  tau_crit that would discard 20% of leaves: {np.quantile(v, 0.80):.4f}')
 
 
 if __name__ == '__main__':
